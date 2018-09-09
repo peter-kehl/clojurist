@@ -1,26 +1,107 @@
+;TODO Learn how to make it a macro - how to access values of a, b instead of their source code
+(defn assert= "Assert equality"
+  ([a b] (assert (= a b) (str "a: " a ", b: " b)))
+  ([a b msg] (assert (= a b) msg)))
 
-(doc map)
-(doc doc)
+; structures
+(assert (= #{2 1 4 3} (sorted-set 2 1 4 3))) ;beware sorted and hash sets with same items are equal!
+(assert (= (list 1 2) '(1 2))) ;similar to vector
+(assert (= (#{1 2} 1) 1))
+(assert= (range 1 3) '(1 2))
+(assert (= [1 2] '(1 2)))
+
+(defn modulo-four-comparator "compare after modulo 4" [a b] (< (mod a 4) (mod b 4)))
+(= (sorted-set) #{}) ;true! Sets equal by items, regardless of comparator.
+(= (sorted-set-by modulo-four-comparator) #{}) ;true!
+(assert (= (conj (sorted-set-by modulo-four-comparator) 1 4 5) #{4 1}))
+
+(type (conj  {})) ;check for # with {...} literals.
+(type (conj #{}))
+
+(= {} #{}) ;false is confusing if you missmatch types
+(.getSuperclass (class {}))
+
+; TODO as a macro? Either way: Print the Clojure source and/or line # in assert.
+; TODO sequences and vectors to be equal
+; TODO clojure.lang.LongRange, clojure.lang.Range; Seq in general
+(defn =typed
+  "Compare two values as with =, but also checking their type compatibility.
+  'options' can incude :order for differentiating between ordered and unordered
+  collections or maps. :strict for exact type match (not advised for collections/sequences)."
+  [a b & options]
+  (if
+    (and
+       (not= (type a) (type b)
+         (or
+             (contains? (apply vector options) :strict)
+             ; unordered and ordered maps and sets are equal, respectively, unless :ordered or :strict.
+             ; Following uses classes/interfaces that are parent to both unordered and ordered versions
+               (and
+                    (not (and (instance? clojure.lang.APersistentMap a)
+                              (instance? clojure.lang.APersistentMap b)))
+                    (not (and (instance? clojure.lang.APersistentSet a)
+                              (instance? clojure.lang.APersistentSet b)))
+                    (not (and (instance? clojure.lang.PersistentVector a)
+                              (instance? clojure.lang.PersistentList)))))))
+    (do
+      (assert false (Exception. (str "Types differ: " (type a) (type b))))
+      false)
+    (= a b)))
+
+; TODO assert that it fails: (assert (not (=typed {} #{})))
+; TODO ---- check *assert* and catch AssertionError only
+(isa? (.getClass {}) Object)
+(isa? (.getClass {}) clojure.lang.PersistentArrayMap)
+(assert (instance? clojure.lang.APersistentMap {}))
+(assert (instance? clojure.lang.APersistentMap (sorted-map)))
+(assert (instance? clojure.lang.APersistentSet #{}))
+(assert (instance? clojure.lang.APersistentSet (sorted-set)))
+(assert (instance? clojure.lang.ArraySeq ( (fn [& params] params) :any-non-empty)))
+;(extends? (Object.) Object)
+
+(defn for-all "Combine items from each given sequence." [seq & more]
+ (loop [combinations '(()) seq seq more more]
+   (if seq
+     (recur (for [one seq combined combinations] (cons one combined))
+       (first more)
+       (next more))
+     #_else combinations)))
+
+(for-all [1 2] [true false])
+(for-all [1 2] [true false] '(:a :b))
+
+(for [a '(true false) b '(true false)]
+  (assert=
+    (not (and a b))
+    (or (not a) (not b))))
+
+(conj {:i 1} [:k 3] [:l 4])
+
+(get #{nil} nil)
+(contains? #{nil} nil)
+(assert (= ({nil 1} nil) 1))
 
 (map (fn [& _] true) #{1 2 3})
 (filter #(do [%] true) [:anything :here])
 
 ;(map (fn [] true) #{1 2 3})
 ;(filter #(do true) [:anything :here])
-[1 #_anything 2]
+[1 #_anything :back-to-evaluating] ; EDN discard
+[1 #_ [2 ANY [INNER within the "block"]] :back-to-evaluating] ; EDN discard
 
+;TODO
 (if false
   (do
    (let [fact (fn [n] (
                           (loop [n n product 1] (if (<= n 1) product (recur (dec n) (* n product))))))]  (fact 4))
-           
+
    (let [fact (fn [n] (
                           (loop [n n product 1]
                             (if (<= n 1)
                               product
                               (recur (dec n) (* n product))))))]  (fact 4))))
 
-  
+
 
 (let [fact (fn [n] ;Don't have an extra ( here. Otherwise you'll get: Long can't be cast to class clojure.lang.IFn!
                (loop [n n product 1]
@@ -28,25 +109,50 @@
                    (do (println product) product)
                    (do (println (str "n " n ", product " product)) (recur (dec n) (* n product))))))] (fact 4))
 
-(if false nil)
-
-( (fn [x] {:post [(= % x)]} x) :anything) ;=> :anything - OK 
+( (fn [x] {:post [(= % x)]} x) :anything) ;=> :anything - OK
 ;( (fn [x] {:post [(= % x)]} :incorrect) :anything) ;=> nothing shown as a result in InstaREPL
 *assert* ;=> true
 
+(assert (= (int 0.6) 0)); round down!
+
+; comp
 ( (comp :street :address) {:address {:street "1 Main"}})
 (let [address-part (fn [address-field-keyword]
                      (comp address-field-keyword :address))]
-                     
   ( (address-part :street) {:address {:street "1 Main"}}))
 
-
-(= (int 0.6) 0) ; round down!
 ((comp int inc #(/ % 2)) 10)
-
 ( (fn [text]
     (reduce
-     #_applier_of_each_function_from_vector (fn [text transformation] (transformation text))
-     text
-     #_vector_of_transformations [clojure.string/upper-case #(str "Hi " %)]))
-  "john")
+      #_applier_of_each_function_from_vector (fn [text transformation] (transformation text))
+      text
+      #_vector_of_transformations [clojure.string/upper-case #(str "Hi " %)]))
+ "john")
+
+(= identity (comp)) ; identity accepts one parameter only!
+
+(defn my-reverse [coll]
+  (loop [coll coll result (empty coll)]
+    (if (not-empty coll)
+      (recur (pop coll) (conj result (peek coll)))
+      result)))
+(= (my-reverse [1 2 3 4]) [4 3 2 1])
+(= (my-reverse []) [])
+(= (my-reverse '(1 2 3 4)) '(4 3 2 1))
+(= (my-reverse '()) '())
+
+(defn my-comp
+  ;[] (do identity)
+  [& functions]
+  (fn [& params]
+    (loop [reversed-functions (reverse functions)
+           params params]
+      (let [func (peek reversed-functions)]
+        (if func
+          (recur (pop reversed-functions) (conj '() (apply func params)))
+          #_apply_expects_params_to_be_a_sequence_but_previous_functions_return_one_value
+          (first params))))))
+
+(assert (= ((my-comp :street :address) {:address {:street "1 Main"}}) "1 Main"))
+
+( (fn [& params] params) :hi); [...] & params] captures into a sequence, not a collection
