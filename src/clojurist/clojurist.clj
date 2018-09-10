@@ -21,32 +21,63 @@
 (= {} #{}) ;false is confusing if you missmatch types
 (.getSuperclass (class {}))
 
+; TODO pass "expected" result(s), handle and undo them in (try (finally)).
+; or (bind..) but for other threads: the macro creates an (anonymous) function and calls it
+; -- but how to apply it to deeper but indirect macro-like calls?
+; Can't assign macros to variables.
+; (def ^:dynamic *g* 1) (binding [*g* 2] ...)
+; https://clojure.org/reference/vars: var (def), atom, ref (if you need transactions) or agent (for async change).
+; InheritableThreadLocal. childValue
+; API design: io! macro: If the first expression in body is a literal string, will use that as the exception message. deref macro: timeout-ms timeout-val: return  timeout-val if the timeout is reached.
+; transactions: dosync, alter, commute
+; https://clojure.org/reference/agents and atoms: co-ordination, synchronisity
+; add-watch: Var watchers are triggered only by root binding changes, not thread-local set!s.
+; TODO (macroexpand ..)
+(defmacro orExplain
+    ([result] (orExplain :no_explanation))
+    ([result explanation]
+     (or result (assert false explanation)))
+)
+
 ; TODO as a macro? Either way: Print the Clojure source and/or line # in assert.
 ; TODO sequences and vectors to be equal
 ; TODO clojure.lang.LongRange, clojure.lang.Range; Seq in general
 (defn =typed
   "Compare two values as with =, but also checking their type compatibility.
   'options' can incude :order for differentiating between ordered and unordered
-  collections or maps. :strict for exact type match (not advised for collections/sequences)."
+  collections or maps, :strict for exact type match (not advised for collections/sequences),
+  :explain to assert failure with an explanation why the result would be false.
+  This is NOT a subrelation of =, because Clojure's = treats lists and vectors as comparable."
   [a b & options]
-  (if
-    (and
-       (not= (type a) (type b)
+  (and
+    (orExplain (= a b) "Values not equal.")
+    (or
+       (= (type a) (type b)
+       (let [optionsVec (apply vector options)
+             bothAreMaps (and (instance? clojure.lang.APersistentMap a)
+                              (instance? clojure.lang.APersistentMap b))
+             bothAreSets (and (instance? clojure.lang.APersistentSet a)
+                              (instance? clojure.lang.APersistentSet b))
+             bothAreVectors (and (instance? clojure.lang.PersistentVector a)
+                                 (instance? clojure.lang.PersistentVector b))
+             bothAreSequences (and (instance? clojure.lang.PersistentList a)
+                                   (instance? clojure.lang.PersistentList b))
+             ]
          (or
-             (contains? (apply vector options) :strict)
-             ; unordered and ordered maps and sets are equal, respectively, unless :ordered or :strict.
-             ; Following uses classes/interfaces that are parent to both unordered and ordered versions
-               (and
-                    (not (and (instance? clojure.lang.APersistentMap a)
-                              (instance? clojure.lang.APersistentMap b)))
-                    (not (and (instance? clojure.lang.APersistentSet a)
-                              (instance? clojure.lang.APersistentSet b)))
-                    (not (and (instance? clojure.lang.PersistentVector a)
-                              (instance? clojure.lang.PersistentList)))))))
+           (contains? optionsVec :strict)
+           ; unordered and ordered maps and sets are equal, respectively, unless :ordered or :strict.
+           ; Following uses classes/interfaces that are parent to both unordered and ordered versions
+           (and
+                (not )
+                (not (and (instance? clojure.lang.APersistentSet a)
+                          (instance? clojure.lang.APersistentSet b)))
+                (not (and (instance? clojure.lang.PersistentVector a)
+                          (instance? clojure.lang.PersistentList))))))))
     (do
       (assert false (Exception. (str "Types differ: " (type a) (type b))))
       false)
-    (= a b)))
+    )
+  )
 
 ; TODO assert that it fails: (assert (not (=typed {} #{})))
 ; TODO ---- check *assert* and catch AssertionError only
