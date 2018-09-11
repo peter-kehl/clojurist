@@ -61,27 +61,17 @@ public class ITLRemoveTest {
         progenitor.join();
 
         for(int i = 0; i<THREAD_COUNT; i++){
-            final int checkValue; // = i+INITIAL_VALUE;
+            final int checkValue;
 
             /* If the remove method is called then the ThreadLocal value will
              * be its initial value */
             if( Arrays.binarySearch( removeNode, i)>=0 ) {
                 checkValue = INITIAL_VALUE;
             }
-            /*for(int removeId : removeNode)
-                if(removeId == i){
-                    checkValue = INITIAL_VALUE;
-                    break;
-                }*/
             else
             if( Arrays.binarySearch( removeAndSet, i)>=0 ) {
                 checkValue = REMOVE_SET_VALUE;
             }
-            /*for(int removeId : removeAndSet)
-                if(removeId == i){
-                    checkValue = REMOVE_SET_VALUE;
-                    break;
-                }*/
             else {
                 checkValue = i+INITIAL_VALUE;
             }
@@ -94,11 +84,9 @@ public class ITLRemoveTest {
     }
     private static class MyThread extends Thread {
         public void run() {
-
             Thread child = null;
-            int threadId=0;
+            final int threadId= n.get();
             try{
-                threadId = n.get();
                 // Creating child thread...
                 if (threadId < (THREAD_COUNT-1+INITIAL_VALUE)) {
                     child = new MyThread();
@@ -108,20 +96,29 @@ public class ITLRemoveTest {
                 for (int j = 0; j<threadId; j++)
                     Thread.currentThread().yield();
 
+                final int threadPosition= threadId-INITIAL_VALUE; // 0-based position within all non-main threads
                 // To remove the ThreadLocal value...
-                for(int removeId  : removeNode)
+                if( Arrays.binarySearch(removeNode, threadPosition)>=0 ) {
+                    n.remove();
+                }
+                /*for(int removeId  : removeNode)
                    if((threadId-INITIAL_VALUE) == removeId){
                        n.remove();
                        break;
-                   }
+                   }*/
 
                  // To remove the ThreadLocal value and set new value ...
-                 for(int removeId  : removeAndSet)
+                 else
+                 if( Arrays.binarySearch(removeAndSet, threadPosition)>=0 ) {
+                        n.remove();
+                        n.set(REMOVE_SET_VALUE);
+                 }
+                 /*for(int removeId  : removeAndSet)
                     if((threadId-INITIAL_VALUE) == removeId){
                         n.remove();
                         n.set(REMOVE_SET_VALUE);
                         break;
-                    }
+                    }*/
                 x[threadId-INITIAL_VALUE] =  n.get();
             }catch(Throwable ex){
                 exceptions[threadId-INITIAL_VALUE] = ex;
