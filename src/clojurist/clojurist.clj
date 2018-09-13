@@ -21,6 +21,10 @@
 (= {} #{}) ;false is confusing if you missmatch types
 (.getSuperclass (class {}))
 
+(instance? clojure.lang.ISeq []) ;false
+;(iterate #(.getSuperclass %) (.getClass '(1))) ;get all classes, but it fails after reaching Object
+
+
 ; TODO pass "expected" result(s), handle and undo them in (try (finally)).
 ; or (bind..) but for other threads: the macro creates an (anonymous) function and calls it
 ; -- but how to apply it to deeper but indirect macro-like calls?
@@ -36,8 +40,8 @@
 (defmacro orExplain
     ([result] (orExplain :no_explanation))
     ([result explanation]
-     (or result (assert false explanation)))
-)
+     (or result (assert false explanation))))
+
 
 ; TODO as a macro? Either way: Print the Clojure source and/or line # in assert.
 ; TODO sequences and vectors to be equal
@@ -53,31 +57,31 @@
     (orExplain (= a b) "Values not equal.")
     (or
        (= (type a) (type b)
-       (let [optionsVec (apply vector options)
-             bothAreMaps (and (instance? clojure.lang.APersistentMap a)
-                              (instance? clojure.lang.APersistentMap b))
-             bothAreSets (and (instance? clojure.lang.APersistentSet a)
-                              (instance? clojure.lang.APersistentSet b))
-             bothAreVectors (and (instance? clojure.lang.PersistentVector a)
-                                 (instance? clojure.lang.PersistentVector b))
-             bothAreSequences (and (instance? clojure.lang.PersistentList a)
-                                   (instance? clojure.lang.PersistentList b))
-             ]
-         (or
-           (contains? optionsVec :strict)
+        (let [optionsVec (apply vector options)
+              bothAreMaps (and (instance? clojure.lang.APersistentMap a)
+                               (instance? clojure.lang.APersistentMap b))
+              bothAreSets (and (instance? clojure.lang.APersistentSet a)
+                               (instance? clojure.lang.APersistentSet b))
+              bothAreVectors (and (instance? clojure.lang.PersistentVector a)
+                                  (instance? clojure.lang.PersistentVector b))
+              bothAreSequences (and (instance? clojure.lang.PersistentList a)
+                                    (instance? clojure.lang.PersistentList b))]
+             
+          (or
+            (contains? optionsVec :strict)
            ; unordered and ordered maps and sets are equal, respectively, unless :ordered or :strict.
            ; Following uses classes/interfaces that are parent to both unordered and ordered versions
-           (and
-                (not )
-                (not (and (instance? clojure.lang.APersistentSet a)
-                          (instance? clojure.lang.APersistentSet b)))
-                (not (and (instance? clojure.lang.PersistentVector a)
-                          (instance? clojure.lang.PersistentList))))))))
+            (and
+                 (not)
+                 (not (and (instance? clojure.lang.APersistentSet a)
+                           (instance? clojure.lang.APersistentSet b)))
+                 (not (and (instance? clojure.lang.PersistentVector a)
+                           (instance? clojure.lang.PersistentList))))))))
     (do
       (assert false (Exception. (str "Types differ: " (type a) (type b))))
-      false)
-    )
-  )
+      false)))
+    
+  
 
 ; TODO assert that it fails: (assert (not (=typed {} #{})))
 ; TODO ---- check *assert* and catch AssertionError only
@@ -187,3 +191,175 @@
 (assert (= ((my-comp :street :address) {:address {:street "1 Main"}}) "1 Main"))
 
 ( (fn [& params] params) :hi); [...] & params] captures into a sequence, not a collection
+
+(defn loop-access-outer [par]
+  (loop [i 5]
+    (if (> i 0)
+      (recur (dec i))
+      par)))
+(loop-access-outer :hi)     
+    
+(def varr 1)
+(type #'varr) ; Var
+(let [x 1] (type #'x)) ;(let) doesn't define "Var" but a symbol
+
+(assert= (let [x 0] (let [x (inc x)] x)) 1) ;(let) can re-bind an existing symbol
+
+(into [] '(1 2)) ; sequence into vector
+(apply vector '(1 2)) ;another way
+(vec '(:a :b :c))
+(vector :a :b :c)
+
+(let [veccy [1 2 3]] (let [ [& sequ] veccy] sequ)); Vector into sequence
+(seq [1 2 3]) ; Vector into sequence - easy
+(list 1 2 3);
+
+(let [[one & others] '[1 2 3]] others) ;Like & rest-param in functions, destructuring a vector in & rest-param via (let [[.. & rest-param]]) makes the rest a sequence!
+
+(-> "john" (clojure.string/capitalize) (#(str "Hi " %))) ;Threading macro but into a second/further parameter: via anonymous function #().
+(->> "john" (clojure.string/capitalize) (str "Hi "));
+
+(map (fn [name age] {:name name :age age}) ["John" "Luke"] '(19 23))
+({:name "John", :age 19} {:name "Luke", :age 23}) ;(map) accepts both vectors and sequences
+
+(conj {:a 1} {:b 2}) ;(conj) to a map accepts both map(s) or vector(s) of pairs
+(conj {:a 1} [:b 2])
+
+( (partial + 1 2) 4)
+( #(nth % (dec (count %))) [1 2 3]) ;same as (last [1 2 3])
+( #(if (= %2 0) (first %1) (recur (rest %1) (dec %2))) [1 2 3 4] 2) ; same as (nth [1 2 3 4] 2)
+( #(loop [s % C 0] (if (= s []) C (recur (rest s) (inc C)))) '(1 2 3)) ; alternative to (count '(1 2 3))
+#(apply + (map (fn [_] 1) %)) ;short alt. to count
+
+(rseq [1 2]) ; same as reverse; both return sequences
+(= (rseq (sorted-map :i 1 :j 2)) '([:j 2] [:i 1])) ;reverse or rseq of a map returns a sequence of map entries (each a vector) in reverse order
+
+( #(loop [in % out '()]
+     (if (not (empty? in))
+       (recur (rest in) (cons (first in) out))
+       out))
+       
+ [1 2 3 4]) ;alt. to reverse; rest can return an empty sequence, but next can return nil. (cons x seq) but (conj coll x...)
+
+;
+( (fn [s]
+    (map (vec s) ;use the vector as a function
+      (range (dec (count s)) -1 -1))) ;reverse range
+ [1 2 3])
+(
+ (fn [s]
+  (reduce conj '() s)) ;short reverse
+ '(1 2 3))
+
+(#(reduce + 0 %) '(1 2 3)) ;sum up
+(reduce + [1 2 3]) ;sum up
+
+( #(filter odd? %) [0 1 2 3])
+
+
+; Fibonacci 8: '(1 1 2 3 5 8 13 21)
+( (fn [N]
+    (case N
+      [1] 1
+      [2] [1 1]
+      (loop [so-far [1 1] n 3 N N]
+         (if (<= n N)
+           (recur (conj so-far (+ (so-far (- n 3)) (so-far (- n 2)))) (inc n) N)
+           so-far)))) 8)
+( #(let [v (vec %)] (= v (reverse v))) "abcba") ;palindrome?  http://www.4clojure.com/problem/27    
+       
+( (fn [ [& items]] items) [1 2]) ;destructurizes both '(1 2) and [1 2], into a seq.
+( (fn [in]
+    (loop [[& in] in
+           out '()]
+      (if (empty? in)
+        out
+          (let [one (first in)
+                others (rest in)] #_rest_can_return_empty
+            (if (or (seq? one) (vector? one)) #_ (:instead :use coll?)
+              (recur
+                (if (empty? one)
+                  (concat (rest one) others)
+                  (concat [(first one)] (rest one) others))
+                out)
+              (recur
+                others
+                (concat out [one])))))))
+ [1 2 [3 [4] '(5)]]) ;http://www.4clojure.com/problem/28
+;from others:
+(fn [ss]
+  (letfn [(flt [s]
+              (if (coll? s)
+                (apply concat (map flt s))
+                [s]))]
+   (flt ss)))
+(fn c [s] (if (sequential? s) (mapcat c s) [s])) ;non-tail recursive
+(fn [s]
+  (filter (complement sequential?)
+    (tree-seq sequential? seq s)))
+
+;http://www.4clojure.com/problem/solutions/29
+((fn [st]
+  (let [isUpperCh
+        (fn [ch]  (re-find #"[A-Z]" (str ch)))]
+   (apply str (filter isUpperCh st)))) 
+ "cVaAbXyP")
+;from others:
+(fn [x] (clojure.string/join (re-seq #"[A-Z]" x)))
+(fn [s] (apply str (filter #(Character/isUpperCase %) s)))
+#(clojure.string/replace % #"[^A-Z]" "")
+#(apply str (re-seq #"[A-Z]" %))
+
+;http://www.4clojure.com/problem/30
+(fn [in]
+  (loop
+    [in (sequence in)
+     out [] #_ sequence_transforms_string_and_keeps_empty_seq]
+    (if (empty? in) ; without this condition recursion run indefinitely, because (rest '()) returned '() again...
+      out
+      (if (empty? out)
+        (recur (rest in) (vector (first in)))
+        (if (= (first in) (last out))
+          (recur (rest in) out)  #_skip
+          (recur (rest in) (conj out (first in))))))))
+ ;from others:
+(fn [s
+        (->> (partition 2 1 [0] s)
+             (remove #(= (first %) (last %)))
+             (map first))])
+#(->> % (partition-by identity) (map first)) 
+(fn [a]
+  (map first (partition-by identity a)))
+#(reduce (fn [a itm] (if (= (last a) itm) a (conj a itm))) [] %)
+
+
+      
+    
+    
+    
+    
+  
+  
+          
+          
+      
+      
+    
+    
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
