@@ -332,7 +332,39 @@
   (map first (partition-by identity a)))
 #(reduce (fn [a itm] (if (= (last a) itm) a (conj a itm))) [] %)
 
+;http://www.4clojure.com/problem/31
+((fn pack
+  ([in] (pack in [])) ;can't recur into version with a different number of arugments!
+  ([in out] (pack in out :nothing-repeated))
+  ([in out prev]
+   (if (empty? in)
+     out
+     (let [one (first in)]
+      (if (= one prev)
+        (recur 
+          (rest in)
+          (conj
+            (pop out)
+            (let [pushed (peek out)]
+              (if (= pushed one)
+               [one one] #_ (the first time it is repeated, hence make it into a list)
+                
+               (conj (peek out) one))))
+          one)
+        (recur
+          (rest in)
+          (conj out [one]) ;without making one into a vector it would be as per https://github.com/4clojure/4clojure/issues/305 
+          one))))))
+ [1 1 2 1 1 1 1 3 3])
 
+;http://www.4clojure.com/problem/32
+(reduce #(conj %1 (vector %2 %2)) [] [1 2 3])
+ 
+   
+  
+   
+   
+  
       
     
     
