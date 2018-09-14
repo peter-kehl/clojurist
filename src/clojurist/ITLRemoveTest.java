@@ -66,7 +66,7 @@ public class ITLRemoveTest {
             /* If the remove method is called then the ThreadLocal value will
              * be its initial value */
             if( Arrays.binarySearch( removeNode, i)>=0 ) {
-                checkValue = INITIAL_VALUE;
+                checkValue = INITIAL_VALUE; // NOT based on parent thread's value!
             }
             else
             if( Arrays.binarySearch( removeAndSet, i)>=0 ) {
@@ -92,9 +92,10 @@ public class ITLRemoveTest {
                     child = new MyThread();
                     child.start();
                 }
-
-                for (int j = 0; j<threadId; j++)
-                    Thread.currentThread().yield();
+                // threadLocal.get() must work even if the parent thread finishes, and it shouldn't lock the parent thread. Plus, yield() in the following is a hint only. Hence the test should work without it, too.
+                
+                /*for (int j = 0; j<threadId; j++)
+                    Thread.currentThread().yield();/**/
 
                 final int threadPosition= threadId-INITIAL_VALUE; // 0-based position within all non-main threads
                 // To remove the ThreadLocal value...
