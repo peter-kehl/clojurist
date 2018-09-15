@@ -212,27 +212,118 @@ fn [s n]
 ;http://www.4clojure.com/problem/43 reverse interleave
 (
  (fn [s n]
-   (map-indexed
-     (fn [i e])
-     s))
-   
-   
- [1 2 3 4 5 6] 2)
+   (reduce
+     (fn [result [index entry]]
+       (update-in ; 4Clojure has old Clojure without update
+         result
+         (list (mod index n)) ;cycle/partition between n sub-sequences
+         #(conj % entry)))
+       
+     (vec (repeat n [])) ; When typing in InstaREPL, type boundaries first.
+     (map-indexed
+       (fn [i e]
+         [i e])
+       s)))
+ 
+ #_( [1 2 3 4 5 6] 2)
+ (range 10) 5)
+;others
+(fn [c n] (map #(take-nth n (drop % c))(range n))) ;<<< drop
+(fn [s n]
+    (map (fn [l] (map last l))
+      (vals)
+      (group-by ; <<<<<<<<<<<<<
+        (fn [l] (mod (first l) n))
+        (map-indexed list s))))
+(group-by #(mod % 2) '(1 2 3)) ;values with unique key get wrapped in a vector anyway
+#(vals (group-by (fn [itm] (mod itm %2)) %1))
+#(apply map list (partition %2 %))
+(fn [s x
+         (map #(take-nth x (drop % s)) ;<<<<<< take-nth
+              (range x))])
 
+;http://www.4clojure.com/problem/44 rotate in *either* direction
+; subseq, rsubseq work with sorted collections only!
+( (fn [n s]
+    (let [n (mod n (count s))]
+      (concat (drop n s) (take n s))))
+ 2 [1 2 3 4 5])
+(assert (= (mod -2 5) 3))
+;others
+#(let [idx (mod %1 (count %2))]
+   (concat (drop idx %2) (take idx %2)))
+#(take (count %2) (drop (mod % (count %2)) (cycle %2)))
+#(take (count %2) (drop (mod %1 (count %2)) (flatten (repeat 2 %2)))) ;cycle = flatten (repeat ...)
+(fn [n s]
+  (let [[a b] (split-at (mod n (count s)) s)]
+    (concat b a)))
+; also take-last, drop-last
+; (->> a (take 7) (drop 3)) ; get 4 elements starting from 3
 
+;http://www.4clojure.com/problem/46 higher order reverse args
+((
+  #(
+     fn [ & args]
+     (apply % (reverse args)))
+  nth)
+ 2 [1 2 3 4 5])
 
+;http://www.4clojure.com/problem/49 split-at
+((fn [n s]
+   [(take n s) (drop n s)])
+ 3 [1 2 3 4 5 6])
+        
+((fn [n s]
+   [(take n s) (drop n s)])
+ 3 [1 2 3 4 5 6])
+ ;others         
+(juxt take drop)
 
+;http://www.4clojure.com/problem/50 split by type 
+( (fn [c] (vals
+            (group-by
+             #(type %)
+             c)))
+ [1 :a 2 :b 3 :c])
+;others
+#(vals (group-by type %)) ;vals = map second
+#(map second (group-by type %)) ;(map identity {:i 1}) shows that function "map" applied to a map passes entries as a vector [key value].
 
-
-  
-          
-          
-      
-      
-    
-    
-    
-
+;http://www.4clojure.com/problem/53 Longest Increasing Sub-Seq
+((fn [s]
+   (loop [s s result [] candidate []]
+     (if (empty? s)
+       (if (>= (count result) (count candidate)) ;don't choose between result and candidate on every "success" (continuous growth) iteration, only at the end or when restarting a new candidate
+        result
+        candidate)
+       (if (empty? candidate)
+         (recur (drop 1 s) result [(first s)])
+         (let [sFirst (first s) candidateLast (last candidate)]
+           (if (> sFirst candidateLast)
+             (recur (drop 1 s) result (concat candidate '(candidateLast)))
+             (if (>= (count result) (count candidate))
+               (recur (drop 1 s) result [])
+               (recur (drop 1 s) candidate []))))))))
+             
+ [1 0 1 2 3 0 4 5])
+ 
+((fn [s]
+   (loop [s s result [] candidate []]
+     (if (empty? s)
+       (if (>= (count result) (count candidate)) ;don't choose between result and candidate on every "success" (continuous growth) iteration, only at the end or when restarting a new candidate
+        result
+        candidate)
+       (if (empty? candidate)
+         (recur (drop 1 s) result [(first s)])
+         (let [sFirst (first s) candidateLast (last candidate)]
+           (if (> sFirst candidateLast)
+             (recur (drop 1 s) result (concat candidate (list candidateLast)))
+             (if (>= (count result) (count candidate))
+               (recur (drop 1 s) result [])
+               (recur (drop 1 s) candidate []))))))))
+             
+ [1 0 1 2 3 0 4 5])
+; Sequence literals don't recognise bound symbols! Don't use '(variableName) but (list variableName). 
 
 
 
