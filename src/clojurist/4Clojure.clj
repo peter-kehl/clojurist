@@ -291,39 +291,60 @@ fn [s n]
 
 ;http://www.4clojure.com/problem/53 Longest Increasing Sub-Seq
 ((fn [s]
-   (loop [s s result [] candidate []]
-     (if (empty? s)
-       (if (>= (count result) (count candidate)) ;don't choose between result and candidate on every "success" (continuous growth) iteration, only at the end or when restarting a new candidate
-        result
-        candidate)
-       (if (empty? candidate)
-         (recur (drop 1 s) result [(first s)])
-         (let [sFirst (first s) candidateLast (last candidate)]
-           (if (> sFirst candidateLast)
-             (recur (drop 1 s) result (concat candidate '(candidateLast)))
-             (if (>= (count result) (count candidate))
-               (recur (drop 1 s) result [])
-               (recur (drop 1 s) candidate []))))))))
-             
- [1 0 1 2 3 0 4 5])
+   (let [winner
+         (fn [candidate result]
+             (if
+               (and
+                (> (count candidate) (count result)) ;Don't shorten into > (count candidate) (count result) 1, because initially result is empty.
+                (> (count candidate) 1))
+               candidate
+               result))]
+     (loop [s s result [] candidate []]
+          (if (empty? s)
+            (winner candidate result)
+            (if (empty? candidate)
+              (recur (drop 1 s) result [(first s)])
+              (let [sFirst (first s)]
+                (if (> sFirst (last candidate))
+                  (recur (drop 1 s) result (concat candidate (list sFirst)))
+                  #_ "else_capture_candidate_if_winner_and_restart_the_search. However, that doesn't capture if the winner is the tail."
+                  (recur (drop 1 s) (winner candidate result) [sFirst]))))))))
  
-((fn [s]
-   (loop [s s result [] candidate []]
-     (if (empty? s)
-       (if (>= (count result) (count candidate)) ;don't choose between result and candidate on every "success" (continuous growth) iteration, only at the end or when restarting a new candidate
-        result
-        candidate)
-       (if (empty? candidate)
-         (recur (drop 1 s) result [(first s)])
-         (let [sFirst (first s) candidateLast (last candidate)]
-           (if (> sFirst candidateLast)
-             (recur (drop 1 s) result (concat candidate (list candidateLast)))
-             (if (>= (count result) (count candidate))
-               (recur (drop 1 s) result [])
-               (recur (drop 1 s) candidate []))))))))
-             
- [1 0 1 2 3 0 4 5])
+ 
+ [2 3 3 4 5] #_[7 6 5 4] #_[1 0 1 2 3 0 4 5])
 ; Sequence literals don't recognise bound symbols! Don't use '(variableName) but (list variableName). 
+;others
+(fn [s] 
+    (->>
+      (for [a (range (count s)) 
+            b (range (inc a) (count s))]
+        (subvec s a (inc b)))
+      (filter #(apply < %))
+      (sort-by count >)
+      first
+      vec))
+;
+complement ;higher order
+;https://clojuredocs.org/clojure.core/for
+(time (dorun (for [x (range 1000) y (range 10000) :when (> x y)] [x y])))
+
+;http://www.4clojure.com/problem/54 partition
+( (fn [n in]
+    (map
+      (fn [vec-of-pairs]
+        (map
+          #(:item %)
+          vec-of-pairs))
+      (filter
+        #(= (count %) n)
+        (vals
+          (group-by #(int (/ (:index %) n))
+            (map-indexed
+              (fn [index item]
+                {:index index :item item})
+              in))))))
+ 
+ 3 (range 2 10))
 
 
 
@@ -347,3 +368,30 @@ fn [s n]
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
