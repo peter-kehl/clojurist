@@ -490,7 +490,26 @@ reduce #(if ((set %) %2) % (conj % %2)) []
               (take (dec (count fns)) fns))))))
              
    rest reverse)
- [1 2 3 4]
+ [1 2 3 4])
+; (rest) is better than (next), because it it returns an empty sequence rather than nil.
+; Then use (if (empty?)) rather than direct (if). Benefit: If you change to a different source
+; e.g. (take), the (if) condition stays. 
+; others
+(fn [& args] (reduce (fn [a b] (fn [& more] (a (apply b more)))) args))
+(fn [& fs]
+  (fn [& xs]
+    (first (reduce #(vector (apply %2 %1)) xs (reverse fs)))))
+
+
+; http://www.4clojure.com/problem/59 juxt
+((
+  (fn [ & fns]
+    (fn [& args]
+      (map
+        #(apply % args)
+        fns)))
+  + max min)
+ 2 3 5 1 6 4)
 
 
 
@@ -528,4 +547,36 @@ reduce #(if ((set %) %2) % (conj % %2)) []
 
 
 
- )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
