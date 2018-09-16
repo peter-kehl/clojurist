@@ -326,7 +326,7 @@ fn [s n]
 ;
 complement ;higher order
 ;https://clojuredocs.org/clojure.core/for
-(time (dorun (for [x (range 1000) y (range 10000) :when (> x y)] [x y])))
+(time (dorun (for [x (range 10) y (range 100) :when (> x y)] [x y])))
 
 ;http://www.4clojure.com/problem/54 partition
 ( (fn [n in]
@@ -338,13 +338,159 @@ complement ;higher order
       (filter
         #(= (count %) n)
         (vals
-          (group-by #(int (/ (:index %) n))
+          (group-by #(int (/ (:index %) n)) ;could shorten with: quot
             (map-indexed
               (fn [index item]
                 {:index index :item item})
               in))))))
- 
  3 (range 2 10))
+;others
+(fn [x s]
+  (map #(take x (drop % s)) (range 0 (- (count s) x -1) x)))
+(fn [n s]
+  (loop [in s out []]
+    (if (> n (count in))
+      out
+      (recur (drop n in) (conj out (take n in))))))
+#(filter (fn [m] (= (count m) %1)) (map last (group-by (fn [n] (quot n %1)) %2)))
+(fn part [n l]
+  (loop [remaining l
+         parts (transient [])]
+    (if (>= (count remaining) n)
+      (let [[h t] (split-at n remaining)]
+        (recur t (conj! parts h))) ; transient conj! persistent!
+      (persistent! parts))))
+
+;;http://www.4clojure.com/problem/55 occurrences/ frequencies
+((fn [in]
+   (reduce
+     (fn [out item]
+       (let [existing
+             (some
+               (fn [entry]
+                 (if (= (key entry) item)
+                   entry))
+               out)] ;some on a map returns [key value] but a special one: you can apply (key) and (val)
+         (assoc out
+           item
+           (if existing
+             (inc (val existing))
+             1))))
+     {}
+     in))
+ ;[1 1 2 3 2 1 1]
+ [:b :a :b :a :b])
+ ;'([1 2] [1 3] [1 3]))
+;entries as results of group-by - it works even if entries can be collections.
+((fn [in]
+  (reduce
+    (fn [out [k v]]
+      (assoc out k (count v)))
+    {}  
+    (group-by identity in)))
+ '([1 2] [1 3] [1 3]))
+;others
+#(apply merge-with + (map (fn [x] {x 1}) %))
+#(into {} (for [[k v] (group-by identity %)] [k (count v)]))
+#(into {} (map (fn [[_ [v :as vs]]] [v (count vs)]) (group-by identity %)))
+partial reduce 
+         #(assoc %1 %2 (+ 1 (or (get %1 %2) 0)))
+         {}
+#(reduce (fn [res [k v]] (assoc res k (count v)))
+         {}
+         (group-by identity %))
+;replace remove frequencies
+
+;http://www.4clojure.com/problem/56 distinct
+;not-any?
+; Following failed 4th test only - because group-by doesn't keep the order!
+((fn [in]
+   (keys
+     (group-by
+       identity
+       in)))
+ (range 50))
+ ;[1 2 1 3 1 2 4])
+
+ ; Don't use simple set/map, because they don't keep the insertion order
+(into (sorted-map) [[:l 4] [:k 3] [:j 2] [:i 1]]) ;(into {} [[key value]...]) but not (into {} existing-map)!
+(into (sorted-set) [4 1 5 3])
+((fn [in]
+   (map
+     (fn [{index :index value :val}]
+       value)
+     (into
+       (sorted-set-by ;re-order by origial index
+         (fn [{index-a :index} {index-b :index}]
+           (< index-a index-b)))
+       (into
+         ; into honours the collection/set/map type and the *comparator*, too.
+         (sorted-set-by ; it doesn't accept an existing map, hence a need for a higher (into)
+           (fn [{a :val} {b :val}]
+             (compare a b))) ;Don't use <, because it fails for non-numbers (e.g. keywords and strings)!
+         (map-indexed
+           (fn [index value]
+             {:index index :val value})
+           in)))))
+ '([2 4] [1 2] [1 3] [1 3]))
+ ;(range 50))
+
+; Proof that (into) carries a comparator
+(assert
+  (=
+   (count
+     (into
+       (sorted-set-by
+         #(< (mod % 4) (mod %2 4))
+         0 1)
+       [0 4 1 2])
+     3)))
+; keep-indexed
+
+((fn [in]
+   (reduce ; << like filter with recursion to see existing results
+     (fn [out item]
+       (if (some
+             #(= % item)
+             out)
+        out
+        (conj out item)))
+       
+     []
+     in))  
+     
+ (range 50))
+(assert (not (contains? [4 5] 4))) ;contains? searches by index. Instead, use some
+;others
+#(reduce (fn [v n]
+             (if (some #{n} v)
+               v
+               (conj v n))
+           [] %))
+#(reduce (fn [a itm] (if (some (fn [elm] (= itm elm)) a) a (conj a itm))) [] %)
+reduce #(if ((set %) %2) % (conj % %2)) []
+
+;http://www.4clojure.com/problem/57 recursion
+(fn foo [x] (when (> x 0)
+              (conj (foo (dec x)) x)))
+(assert (= (conj nil 1) '(1))) ;<<< nil becomes '() but only if passed as a collection arg
+
+;http://www.4clojure.com/problem/58 comp
+( ( (fn [& fns]
+      (if (empty? fns)
+        identity
+        (loop [result (last fns) fns (take (dec (count fns)) fns)]
+          (if (empty? fns)
+            result
+            (recur 
+              #((last fns)
+                (apply
+                  result
+                  %&))
+              (take (dec (count fns)) fns))))))
+             
+   rest reverse)
+ [1 2 3 4]
 
 
 
@@ -382,16 +528,4 @@ complement ;higher order
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
- 
+ )
