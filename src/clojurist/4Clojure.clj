@@ -510,10 +510,107 @@ reduce #(if ((set %) %2) % (conj % %2)) []
         fns)))
   + max min)
  2 3 5 1 6 4)
+;others
+(fn [& fs]
+  (let [fs (map #(partial apply %) fs)]
+    (fn [& args]
+      (map #(% args) fs))))
+
+;http://www.4clojure.com/problem/60 reductions
+; Non-lazy
+((fn my-reductions
+   ([func in]
+    (my-reductions func (first in) (rest in)))
+   ([func start in]
+    (reduce
+      (fn [results item]
+        (conj
+          results
+          (func (last results) item)))
+      [start]
+      in)))
+ conj [1] [2 3 4])
+
+; Lazy: Can't do (reverse)
+((fn my-reductions
+   ([func in]
+    (my-reductions func (first in) (rest in)))
+   
+   ([func one in]
+    (cons
+      one
+      (lazy-seq
+        (my-reductions func one one in))))
+    
+   ([func all prev in]
+    (let [two (first in)
+          node (func prev two);not one, but the prev. result
+          all-and-node (conj all node)
+          more (rest in)]
+      
+      (cons
+        node;all-and-node
+        (lazy-seq
+          (if (not (empty? more)) ;Don't compare (count in) because of infinite.
+            (my-reductions func all-and-node node more)
+            '()))))))
+ conj [1] [2 3 4])
+
+((fn my-reductions
+   ([func in]
+    (my-reductions func (first in) (rest in)))
+   
+   ([func one in]
+    (cons
+      one
+      (lazy-seq
+        (my-reductions func one in :internal))))
+   
+   ([func one in internal]
+    (assert (= internal :internal))
+    (let [two (first in)
+          node (func one two);not one, but the prev. result
+          more (rest in)]
+      
+      (cons
+        node
+        (lazy-seq
+          (if (not (empty? more)) ;Don't compare (count in) because of infinite.
+            (my-reductions func node more :internal)
+            '()))))))
+ conj [1] [2 3 4])
+;others
+(fn r 
+  ([f s] (r f (first s) (rest s)))
+  ([f x [a & b]
+    (if a (lazy-cat [x] (r f (f x a) b)) [x])]))
+
+(fn reducts
+  ([f [arg & args]
+    (reducts f arg args)])
+  ([f v [arg & args]
+    (if-not arg
+      (list v)
+      (cons v (lazy-seq (reducts f (f v arg) args))))]))
+
+(fn !
+  ([f [x & xs]] (! f x xs))
+  ([f e [x & xs]
+    (let [n (f e x)]
+      (if (not-empty xs)
+        (cons e (lazy-seq (! f n xs)))
+        [e n]))]))
+
+(fn d
+  ([f x [h & r]] (cons x (if h (lazy-seq (d f (f x h) r)))))
+  ([f [h & r]] (d f h r)))
 
 
+(take 5 (__ + (range)))
+(last (__ * 2 [3 4 5]))
+(assert (= (type (reductions * [1 2 3])) clojure.lang.LazySeq))
 
-
+; http://www.4clojure.com/problem/61 zipmap
 
 
 
