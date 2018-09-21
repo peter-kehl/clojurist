@@ -241,101 +241,113 @@ fn [x]
     (into {})))
 
 ;http://www.4clojure.com/problem/70 sort words only, case insensitive
-(if true
+(if false
  ((fn [sentence]
-    (let [words (clojure.string/split sentence #"[ \t]")]
-      words))
+    (sort
+      #(compare (.toUpperCase %) (.toUpperCase %2))
+       (clojure.string/split sentence #"[ \t,.!]+")))
   "Have a nice day."))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+;others
+#(sort-by (memfn toUpperCase) (re-seq #"\w+" %))
+(fn [s]
+  (sort-by clojure.string/lower-case)
+  (re-seq #"\w+" s))
+#(->> (clojure.string/split % #"\W+")
+      (sort-by clojure.string/lower-case))
+#(sort-by clojure.string/lower-case (re-seq #"\w+" %))
+
+;http://www.4clojure.com/problem/71 rearrange code ->
+; "form" means a [partial] expression
+;http://www.4clojure.com/problem/72 (apply + seq) may be more efficient than (reduce + seq)
+
+;http://www.4clojure.com/problem/73 Tic Tac Toe
+(def tic
+  (fn [[row0 row1 row2]]
+      (let [won
+            (fn [[a b c]]
+              (or
+                  (and
+                      (= a b c)
+                      (some #{a} [:x :o])
+                      a) ;'a' makes (and) return value of a on succes (instead of boolean)
+                  nil))] ; 
+        
+        (or
+            (won row0) (won row1) (won row2)
+            (let [column
+                  (fn [col]
+                    [(row0 col) (row1 col) (row2 col)])]
+              (or
+                  (won (column 0)) (won (column 1)) (won (column 2))
+                  (won [(row0 0) (row1 1) (row2 2)])
+                  (won [(row0 2) (row1 1) (row2 0)])))))))
+(tic [[:e :e :e]
+      [:e :e :e]
+      [:e :e :e]])
+(tic [[:x :e :o]
+      [:x :e :e]
+      [:x :e :o]])
+(tic [[:x :e :o]
+      [:x :x :e]
+      [:o :x :o]])
+;others
+(fn [d]
+  (let [n [0 1 2]
+        s (set
+            (concat
+              d
+              (apply map list d)
+              [(for [a n] (get-in d [a a]))
+               (for [a n] (get-in d [(- 2 a) a]))]))]
+    (cond
+      (s [:x :x :x]) :x
+      (s [:o :o :o]) :o
+      :e nil)))
+;and many others
+
+;http://www.4clojure.com/problem/74 filter perfect squares
+((fn [str]
+   (String/join "," ;onl since Java 8 - not at 4clojure.com
+     (let [in (re-seq #"[0-9]+" str)]
+          (filter
+            #(let [num (Integer/parseInt %)
+                   root (int (Math/sqrt num))]
+               (= num (* root root)))
+            in))))
+ "4,5,6,7,8,9")
+((fn [st]
+   (reduce
+     (fn [out num]
+       (str out "," num))
+     (let [in (re-seq #"[0-9]+" st)]
+          (filter
+            #(let [num (Integer/parseInt %)
+                   root (int (Math/sqrt num))]
+               (= num (* root root)))
+            in))))
+ "4,5,6,7,8,9")
+;others
+(fn [s]
+    (->> (read-string (str \[ s \]))
+      (filter #(let [q (Math/sqrt %)] (= % (* q q))))
+      (interpose \,)
+      (apply str)))
+(fn [s]
+  (apply str (interpose ",")
+    (filter #(let [root (Math/sqrt %)] (= root (int root)))
+      (map #(Integer/parseInt %) (.split s ",")))))
+(fn [s]
+   (->> s
+        (#(clojure.string/split % #","))
+        (map read-string)
+        (filter #(== (Math/sqrt %) (int (Math/sqrt %))))
+        (clojure.string/join ",")))
+(fn [s]
+  (->> (clojure.string/split s #",")
+       (filter #(zero? (mod (Math/sqrt (Double. %)) 1)))
+       (clojure.string/join ",")))
+
+;http://www.4clojure.com/problem/75 Euleur's Totient function: number of coprimes lower than x coprime to x.
 
 
 
