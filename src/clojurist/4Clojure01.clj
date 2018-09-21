@@ -287,7 +287,8 @@ fn [s n]
  [1 :a 2 :b 3 :c])
 ;others
 #(vals (group-by type %)) ;vals = map second
-#(map second (group-by type %)) ;(map identity {:i 1}) shows that function "map" applied to a map passes entries as a vector [key value].
+#(map second (group-by type %)) ;
+(map identity {:i 1}) ;shows that function "map" applied to a map passes entries as a vector [key value]
 
 ;http://www.4clojure.com/problem/53 Longest Increasing Sub-Seq
 ((fn [s]
