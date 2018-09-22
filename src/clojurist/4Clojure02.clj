@@ -1,5 +1,5 @@
 (if false
-; http://www.4clojure.com/problem/61 zipmap
+  ; http://www.4clojure.com/problem/61 zipmap
   ((fn [ks vs]
      (reduce
        (fn [m [k v]]
@@ -12,8 +12,13 @@
          vs)))
    
    [:a :b :c] [1 2 3]))
-  
-(into {} '((:i 1))) ;fails
+
+(defn throws? [f & args]
+    (try
+      (apply f args)
+      false
+      (catch Exception e true)))
+(assert (throws? #(into {} '((:i 1)))))
 (into {} '([:i 1])) ;OK
 (into {} [[:i 1]]) ;OK
 (assoc {} :i 1) ;OK
@@ -54,9 +59,11 @@
 ;others
 #(apply merge-with concat (map (fn [x] {(%1 x) [x]}) %2))
 (fn [f s]
-  (reduce (fn [m a])
-    (let [x (f a)]
-      (assoc m x (conj (get m x []) a)))) {} s)
+  (reduce
+    (fn [m a]
+       (let [x (f a)]
+         (assoc m x (conj (get m x []) a))))
+    {} s))
 (fn [f s] (reduce (fn [a itm] (assoc a (f itm) (concat (a (f itm)) [itm]))) {} s))
 (fn [f coll]
   (reduce 
@@ -116,12 +123,16 @@ assert-expr
 (if false
   (typeOf {:a 1, :b 2}))  
 ;others
-fn [x]
+(fn [x]
   (let [z (into x [[x 1] [x x] [x 1] [x x]])]
-    ({1 :map 2 :set 4 (if (= [x x] (first z)) :list :vector)
-      (- (count z) (count x))}))
+    ({1 :map
+      2 :set
+      4 (if (= [x x] (first z))
+          :list :vector)}
+     (- (count z) (count x)))))
 (comp {\# :set \{ :map \[ :vector \c :list} first str); cheating. But: good use of a {map...} as function
-#(condp = (first (str %))
+
+#(condp = (first (str %)) ; cond with a predicate <<<<
    \[ :vector
    \{ :map
    \# :set
@@ -129,14 +140,14 @@ fn [x]
 (fn [item]
   (cond
     (= (conj item [:test 0] [:test 1])
-       (conj item [:test 1])
-      :map)
+       (conj item [:test 1]))
+    :map
     (= (conj item [:test 0])
-       (conj item [:test 0] [:test 0])
-      :set)
+       (conj item [:test 0] [:test 0]))
+    :set
     (= (last (conj item :test :test2))
-       :test2
-      :vector)
+       :test2)
+    :vector
     :else
       :list))
 (fn [coll]
@@ -348,38 +359,215 @@ fn [x]
        (clojure.string/join ",")))
 
 ;http://www.4clojure.com/problem/75 Euleur's Totient function: number of coprimes lower than x coprime to x.
+(if
+  false
+  ((fn [num]
+       (count
+         (if
+           (= num 1)
+           '(1)
+           (let [prims
+                 ((fn [m] ;from http://www.4clojure.com/problem/67 n first prime numbers, but adjusted
+                    (loop [primes [2]]
+                      (if (>= (last primes) m)
+                        primes
+                        (let [prime
+                              (loop [primeCandidate (inc (last primes))]
+                                (let [primeCandidateSqrt (Math/sqrt primeCandidate)
+                                      divider
+                                      (loop [dividerCandidateIndex 0]
+                                        (let [dividerCandidate (primes dividerCandidateIndex)]
+                                          (if (<= dividerCandidate primeCandidateSqrt)
+                                            (if (not= (mod primeCandidate dividerCandidate) 0) ;use zero?
+                                              (recur (inc dividerCandidateIndex))
+                                              dividerCandidate)
+                                            nil)))]
+                                  (if (not divider)
+                                    primeCandidate
+                                    (recur (inc primeCandidate)))))]
+                          (recur (conj primes prime))))))
+                  num)]
+             (filter
+               (fn [coprime]
+                 (not ;no common divisors
+                   (some
+                     (fn [divisor]
+                       (= (mod coprime divisor) (mod num divisor) 0))
+                     (filter
+                       (fn [divisorCandidate]
+                         (<= divisorCandidate coprime))
+                       prims))))
+               
+               (range 1 num))))))
+   16))
+ ; others
+(fn [s]
+  (letfn [(g [a b] (if (zero? b) a (g b (mod a b))))]
+    (count
+      (filter
+        #(== 1 (g s %))
+        (range s)))))
+(use 'clojure.set)
+#(let [divisors (fn [n] (set (filter (fn [dem] (= 0 (mod n dem))) (range 2 (inc n)))))]
+  (if (= % 1) 1
+    (count (filter (fn [n] (empty? (clojure.set/intersection (divisors n) (divisors %)))) (range 1 %))))) 
+(fn [n]
+  (if (= n 1) 1
+    (let [gcd (fn f [a b] (if (zero? b) a (f b (mod a b))))]
+      (count (filter #(= 1 (gcd n %)) (range 1 n))))))
 
+;http://www.4clojure.com/problem/76 trampoline: for mutual recursion
+(if
+  false
+  (letfn
+    [(foo [veccy y] #(bar (conj veccy y) y))
+     (bar [veccy y] (if (> (last veccy) 10)
+                      veccy
+                      #(foo veccy (+ 2 y))))]
+    (trampoline foo [] 1)))
+; use letfn to declare mtually recursive functions (a function can call another one defined *later*)
 
+;use not-empty, seqable?
+;bound?
 
+;http://www.4clojure.com/problem/77 anagram finder
+(if
+  false
+  ((fn [words]
+      (set (filter
+             #(> (count %) 1); => shorten to: remove #(= 1 (count %))
+             (map set
+               (vals
+                 (group-by
+                   #(sort (seq %)) ; => shorten to: sort
+                   words))))))
+   
+   ["veer" "lake" "item" "kale" "mite" "ever"]))
+; remove
+; others
+(fn [words] 
+  (set (map set) 
+    (filter 
+      #(< 1 (count %)) 
+      (vals 
+        (group-by frequencies words)))))
+; frequencies
+#(set (for [v (vals (group-by sort %))
+            :when (> (count v) 1)]
+        (set v)))
+; for :when
 
+;http://www.4clojure.com/problem/78 trampoline
+(if true
+  (fn [f & args]
+    (loop [f f args args]
+      (if
+        (ifn? f) ;detect whether it's a function. Don't use (fn? ...)
+        (recur (apply f args) [])
+        f))))
+;others
+(fn [f & args]
+  (loop [f (apply f args)]
+    (if (fn? f)
+      (recur (f))
+      f)))
+;-------------
 
+;http://www.4clojure.com/problem/79 triangle minimal path
+;TODO memoized local recursive function. It would save 1/4 time.
+;https://stackoverflow.com/a/13123571/1049315 and/or with-local-vars
+;http://danmidwood.com/content/2013/02/24/exploring-clojure-memoization.html
+(defmacro trace [body]
+  (list 'try body
+    (list 'catch 'Exception 'e (list 'println "ho"))))
+(macroexpand `(trace ((first subtree) col)))
 
+(if false
+  ((fn [tree]
+     (letfn [(sub-paths [subtree col parent-path] ;subtree is a (take N tree); col is a 0-based index in the first row
+               (let [entry ((first subtree) col)
+                     my-path (conj parent-path entry)]
+                 
+                 (if (= (count subtree) 1)
+                   (apply + my-path)
+                   (let [sub-subtree (rest subtree)]
+                     (min
+                       (sub-paths sub-subtree col my-path)
+                       (sub-paths sub-subtree (inc col) my-path))))))]
+       
+       (sub-paths tree 0 []))) ;the start tippoint is only one - no sibling
+   '([1]
+     [2 4]
+     [5 1 4]
+     [2 3 4 5])))
+; others
+(fn [t]
+  (first
+    (reduce
+      (fn [a b]
+        (map #(+ %1 (min %2 %3)) b a (rest a)))
+      (reverse t))))
+(fn [s]
+    (first
+     (reduce
+      #(map + (map min (butlast %1) (rest %1)) %2)
+      (reverse s))))
+fn min-path
+  ([rows] (min-path rows 0))
+  ([rows i] (if-let [[row & rows] rows]
+              (+ (row i)
+                 (min (min-path rows i)
+                      (min-path rows (inc i))))
+              0))
 
+(letfn [(f [stop]
+          (if stop
+            true
+            (recur (not stop))))] ;letfn can (recur)
+  (f false))
 
+;http://www.4clojure.com/problem/80 perfect numbers
+(if false
+  ((fn [n]
+     (loop [i 1 sum 0]
+       (if (= i n)
+         (= sum n)
+         (recur
+           (inc i)
+           (+ sum
+              (if (= (mod n i) 0)
+                i
+                0))))))
+   8128))
+;others
+(fn [x]
+  (= x (reduce + (filter #(= 0 (mod x %)) (range 1 x))))) ;use (zero?)
+(fn [n]
+    (= n (apply + (filter #(zero? (mod n %)) (range 1 n))))) ;apply + instead of reduce +
+(fn perfect? [n]
+  (->> n
+       (range 1)
+       (filter
+         #(zero? (mod n %)))
+       (apply +)
+       (= n)))
+;??? TODO
+(fn [x]
+  (->> (range 1 x)
+       (filter #(zero? (mod x %)))
+       (apply +)
+       (= x)))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+;http://www.4clojure.com/problem/81 intersection
+(if false
+  ((fn [a b]
+     (set
+       (for [x a :when (b x)] x)))
+   #{:a :b :c :d} #{:c :e :a :f :d}))
+;others
+#(set (filter % %2))
+#(set (filter identity (map %1 %2)))
+clojure.set/select
 
 
 
