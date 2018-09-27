@@ -152,7 +152,7 @@
                     (do (swap! passed conj (set edge))
                         (some #(go [to %] (inc n)) (nodes to))))))]
       (->> (for [edge edges]
-             (do (reset! passed #{})
+             (do (reset! passed #{}) ;<<<<TODO
                  (go edge 1)))
            (some identity)
            boolean))))
@@ -180,6 +180,74 @@
                         count
                         (> 3))]
     (and satisfies? connected?)))
+;kohyama:
+(fn k [s]
+  (letfn [
+          (rem [x coll] ;beware that rem is a core function, here hidden!
+            ((fn [[a b]] (concat a (next b)))
+             (split-with #(not= % x) coll)))
+          (paths [[[p q :as prev] :as path] rests]
+            (if (empty? rests)
+              [path]
+              (apply concat
+                (keep
+                  (fn [[r s :as x]]
+                    (cond (nil? prev) ;Nightcode Paredit mode requires condition - result to be either on the same line, or with the same indentation!
+                          (concat
+                            (paths (cons [r s] path) (rem x rests))
+                            (paths (cons [s r] path) (rem x rests)))
+                          (= q s)
+                          (paths (cons [s r] path) (rem x rests))
+                          (= q r)
+                          (paths (cons [r s] path) (rem x rests))))
+                  rests))))]
+    (boolean
+      (some
+        #(= (count %) (count s))
+        (paths () s)))))
+
+;http://www.4clojure.com/problem/90 Cartesian product
+(fn [one two]
+  (set
+    (for [o one
+          t two]
+      [o t])))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
