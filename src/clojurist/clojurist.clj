@@ -3,6 +3,10 @@
   ([a b] (assert (= a b) (str "a: " a ", b: " b)))
   ([a b msg] (assert (= a b) msg)))
 
+; maps and sets are collections, too
+(assert (coll? {}))
+(assert (coll? #{}))
+
 ; structures
 (assert (= #{2 1 4 3} (sorted-set 2 1 4 3))) ;beware sorted and hash sets with same items are equal!
 (assert (= (list 1 2) '(1 2))) ;similar to vector
@@ -66,20 +70,20 @@
                                   (instance? clojure.lang.PersistentVector b))
               bothAreSequences (and (instance? clojure.lang.PersistentList a)
                                     (instance? clojure.lang.PersistentList b))]
-             
+          
           (or
-            (contains? optionsVec :strict)
-           ; unordered and ordered maps and sets are equal, respectively, unless :ordered or :strict.
-           ; Following uses classes/interfaces that are parent to both unordered and ordered versions
-            (and
-                 (not)
-                 (not (and (instance? clojure.lang.APersistentSet a)
-                           (instance? clojure.lang.APersistentSet b)))
-                 (not (and (instance? clojure.lang.PersistentVector a)
-                           (instance? clojure.lang.PersistentList))))))))
-    (do
-      (assert false (Exception. (str "Types differ: " (type a) (type b))))
-      false)))
+              (contains? optionsVec :strict)
+              ; unordered and ordered maps and sets are equal, respectively, unless :ordered or :strict.
+              ; Following uses classes/interfaces that are parent to both unordered and ordered versions
+              (and
+                   (not)
+                   (not (and (instance? clojure.lang.APersistentSet a)
+                             (instance? clojure.lang.APersistentSet b)))
+                   (not (and (instance? clojure.lang.PersistentVector a)
+                             (instance? clojure.lang.PersistentList)))))))
+       (do
+         (assert false (Exception. (str "Types differ: " (type a) (type b))))
+         false))))
     
   
 

@@ -489,7 +489,7 @@ assert-expr
                      my-path (conj parent-path entry)]
                  
                  (if (= (count subtree) 1)
-                   (apply + my-path)
+                   (apply + my-path) ; Too much info: Instead of a (partial) path,  pass the (partial) sum only.
                    (let [sub-subtree (rest subtree)]
                      (min
                        (sub-paths sub-subtree col my-path)
@@ -510,15 +510,23 @@ assert-expr
 (fn [s]
     (first
      (reduce
-      #(map + (map min (butlast %1) (rest %1)) %2)
+      #(map + (map min (butlast %1) (rest %1)) %2) ;<<<< butlast
       (reverse s))))
-fn min-path
+
+(fn min-path
   ([rows] (min-path rows 0))
-  ([rows i] (if-let [[row & rows] rows]
+  ([rows i] (if-let [[row & rows] rows] ;WOW
               (+ (row i)
                  (min (min-path rows i)
                       (min-path rows (inc i))))
-              0))
+              0)))
+ 
+;let and if-let handle destructuring of nil differently: 
+(assert (= (let [[one & more]     []] [one more])  [nil nil]))
+(assert (= (let [[one & more]    nil] [one more]) [nil nil]))
+(assert (= (if-let [[one & more] [] ] [one more])  [nil nil]))
+(assert (= (if-let [[one & more] nil] [one more])        nil)) ;!!
+(if-let [[one & more] nil] [one more])
 
 (letfn [(f [stop]
           (if stop
