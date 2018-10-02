@@ -289,7 +289,7 @@
 (if false
   (graph-connectivity #{[1 2] [2 3] [3 1]
                         [4 5] [5 6] [6 4]}))
-(println "----")
+;(println "----")
 (if false
   (graph-connectivity #{[1 2] [2 3] [3 1]
                         [4 5] [5 6] [6 4] [3 4]}))
@@ -373,6 +373,7 @@
       
 (if false
   (roman "XIV"))
+;(println "---- after my Roman")
 ; Can't (into {} (map reverse {:i 1 :j 2})), because (reverse) doesn't return Map.Entry
 (into {} (map (comp vec reverse) {:i 1 :j 2})) ; (into {} ...) requires the entry pairs to be vector(s), not sequence(s)
 ;zero? is not exactly the same as = 0. Why? zero? requires the parameter to be a number. (zero? \a) or (zero? nil) throws an exception, but (= \a 0) returns false. 
@@ -468,9 +469,9 @@
     (tree-seq sequential? seq s)))
 #(remove (partial every? coll?) (tree-seq (partial every? coll?) identity %))
 (fn [x]
-    (filter #(every? (complement sequential?) %)
-     (filter sequential?
-             (rest (tree-seq sequential? seq x))))) ;<<<< depth-first
+  (filter #(every? (complement sequential?) %)
+    (filter sequential?
+      (rest (tree-seq sequential? seq x))))) ;<<<< depth-first
 (fn [coll]
   (filter
     (complement #(every? sequential? %)) 
@@ -490,6 +491,7 @@
                 [x])
               (flat xs)))
     xs))
+;(println "---- end of partial flatten")
 
 ; http://www.4clojure.com/problem/94 game of life
 (def game-life
@@ -508,25 +510,23 @@
                                        :let [r (+ row r-delta) c (+ col c-delta)]
                                        :when (and (exists r c)
                                                   (not= r-delta c-delta 0)
-                                                  (alive row col))]
+                                                  (alive r c))]
                                    1)))
           alive-next (fn [row col]
                        (let [neighbs (num-neighbs-alive row col)]
-                         (print neighbs)
-                         (if (zero? col) (println))
+                         ;(print neighbs)
+                         ;(if (= col (dec width)) (println))
                          (if (alive row col)
                            (or (= neighbs 2) (= neighbs 3))
                            (= neighbs 3))))]
-      
-      
       (for [row (range 0 height)]
         (apply str
           (for [col (range 0 width)]
             (if (alive-next row col)
               \#
               \space)))))))
-                     
-    
+;(println "game of life")                
+
 (if true 
   (game-life
            ["      "  
@@ -535,19 +535,240 @@
             "   ## "
             "   ## "
             "      "]))
+;(println "after game of life")                
+;others
+(fn [d]
+    (for [i (range (count d))]
+      (apply
+       str
+       (for [j (range (count (d i)))]
+         (let [z (= \# (get-in d [i j])) ;<< get-in coll seq-of-keys
+               v [-1 0 1]
+               u (count (filter #(= \# (get-in d %)) (for [a v, b v] [(+ i a) (+ j b)])))]
+           (if (or (== 3 u) (and z (== 4 u))) \# " "))))))
+(fn [board]
+  (letfn [
+          (row-to-ints     [row] (map #(if (= \# %) 1 0) row))
+          (row-to-bools    [row] (map #(= \# %) row))
+          (shift-row-right [row] (cons 0 row))
+          (shift-row-left  [row] (conj (vec (rest row)) 0))
+          (shift-board-up   [rows] (conj (vec (rest rows)) (map (partial * 0) (first rows))))
+          (shift-board-down [rows] (cons (map (partial * 0) (first rows)) rows))
+          (add-boards [a b] (map (partial map +) a b))
+          (count-neighbors [board]
+            (reduce add-boards 
+              [ (shift-board-up board)
+               (shift-board-down board)
+               (map shift-row-right board)
+               (map shift-row-left board)
+               (shift-board-up (map shift-row-right board))
+               (shift-board-up (map shift-row-left board))
+               (shift-board-down (map shift-row-right board))
+               (shift-board-down (map shift-row-left board))]))
+          (simulate [cell neighbor-count]
+            (cond
+              (and cell (< neighbor-count 2)) false
+              (and cell (< neighbor-count 4)) true
+              (and (not cell) (= neighbor-count 3)) true
+              :else false))
+          (print-board [board]
+            (map (fn [row] (apply str (map #(if % \# " ") row))) board))]
+    (print-board
+      (map (partial map simulate)      
+        (map row-to-bools board)
+        (count-neighbors (map row-to-ints board))))))
+(fn [b]
+    (letfn [(n [r c]
+              (for [i (range -1 2) ;<<< eq. [-1 0 1]
+                    j (range -1 2)
+                    :when (not= 0 i j)]
+                (get-in b [(+ r i) (+ c j)])))]
+      (let [r (count b) c (count (first b))]
+        (->>(for [i (range r)
+                  j (range c)]
+              (let [l (count (filter #(= \# %) (n i j)))]
+                (cond
+                  (and (= l 2)
+                       (= \# (get-in b [i j]))) \#
+                  (= l 3) \#
+                  :else \space)))
+            (partition c) ;<<<<<<<<<<<<<<<<<<<<<<<<
+            (map #(apply str %))))))
+(fn [cells]
+  (let [w (count cells)
+        h (count (first cells))
+        live? (fn [x y] (= \# (get-in cells [y x])))
+        count-lives (fn [cx cy] (count (for [x [(dec cx) cx (inc cx)]
+                                             y [(dec cy) cy (inc cy)]
+                                             :when (live? x y)]
+                                         1)))
+        row (fn [y] (->> (range w)
+                         (map (fn [x]
+                                (let [num-lives (count-lives x y)]
+                                  (if (live? x y)
+                                    (if (#{3 4} num-lives) "#" " ")
+                                    (if (#{3}   num-lives) "#" " ")))))
+                         (apply str)))]
+    (map row (range h))))
 
+;http://www.4clojure.com/problem/95 bin tree?
+(def is-bin-tree?
+  (fn bin-tree? [node]
+    (and (sequential? node)
+         (= (count node) 3)
+         (let [left (nth node 1)
+               right (nth node 2)]
+          (and
+             (or (nil? left) (bin-tree? left))
+             (or (nil? right)(bin-tree? right)))))))
+;others
+(fn f [s] 
+  (if (sequential? s) 
+    (let [[_ a b] s] ;<<<< destructuring => missing values become nil
+      (and (= 3 (count s)) (f a) (f b)))
+    (nil? s)))
+(fn [r]
+    (every?
+     #(or
+       (nil? %)
+       (and (sequential? %) (= 3 (count %))))
+     (tree-seq sequential? rest r))) ;<<<<<
+(fn b-tree? [node]
+   (or 
+     (nil? node)
+     ((every-pred ;<<<<<
+        sequential?
+        (comp (partial = 3) count)
+        (comp b-tree? #(nth % 1))
+        (comp b-tree? #(nth % 2))
+       node))))
+  
+;http://www.4clojure.com/problem/96 symmetric tree?
+(def is-sym-tree?
+  (fn sym-root? [node] ;assume a well-formed binary tree
+    (letfn [(sym-trees? [one two]
+              (or
+                  (= one two nil)
+                  (and
+                       (not (nil? one))
+                       (not (nil? two))
+                       (= (first one) (first two))
+                       (sym-trees? (nth one 1) (nth two 2))
+                       (sym-trees? (nth one 2) (nth two 1)))))]
+      (sym-trees? (nth node 1) (nth node 2)))))
+;others
+#(
+  (fn s [[a b c :as x] [k l m :as y]]
+    (or 
+      (not (or x y))
+      (and (= a k) (s b m) (s c l)))) % %)
+(fn [root]
+  (letfn [(flip [node] (if (coll? node) [(first node) (flip (nth node 2)) (flip (nth node 1))] node))]
+    (= (nth root 1) (flip (nth root 2))))) ;<<< rather than traverse & compare, transform to a form that can be compared by = standard
+(fn [t] 
+  (=
+   (nth t 1) 
+   ((fn flip [node] ;<<< the same as previous, but eliminating leftn. Define a recursive function right where you need it.
+      (if (nil? node)
+        nil 
+        [(nth node 0) (flip (nth node 2)) (flip (nth node 1))]))
+    (nth t 2))))
+(fn [[v l r]] (= l)
+  ((fn mirror [[v l r :as t]] ;<< :as
+     (if (nil? t) nil [v (mirror r) (mirror l)]))
+   r))
+#(let [tree ((fn ! [[v left right :as node]]
+                 (if (coll? node)
+                   (concat (! left) [v] (! right))
+                   [v])) 
+             %)]
+   (= tree (reverse tree))) ;<<< TODO
 
+;http://www.4clojure.com/problem/97 Pascal's triangle
+(def pascal
+  (fn [n]
+    (loop [row '(1)
+           level 1]
+      (if (= level n)
+        row
+        (recur
+          (concat
+            (cons 1 (for [i (range 0 (dec level))] ;reversed order range keeps standard step 1, which results in an empty range
+                      (+ (nth row i) (nth row (inc i))))) ;<< nth fails on wrong index
+            '(1))
+          (inc level))))))     
+(if false
+  (map pascal (range 1 6))) 
+;others
+(fn [x] 
+  (nth 
+    (iterate #(concat [1] (map + % (rest %)) [1]) [1]) ;<<< iterate
+    (dec x)))
+(fn [r]
+  (reduce ;<<<
+    #(cons
+       (* (first %1)
+          (/ (- r %2) %2))
+       %1)
+    [1] (range 1 r)))
+(fn [n]
+    (last (take n (iterate #(map + (concat [0] %) (concat % [0])) [1]))))
 
+;http://www.4clojure.com/problem/98 Equivalence classes
+;partially similar to determining if a group of node edges is fully connected
+(def eq-classes
+  (fn [f D]
+    (reduce
+      (fn [result a]
+        (if false (let [extended
+                         (reduce
+                           (fn [res b-set]
+                             1)
+                           result)]))
+        (let [eq-set
+              (some
+                #(if (= (f a) (f (first %)))
+                   %)
+                result)]
+          (if eq-set
+            (conj
+              (disj result eq-set)
+              (conj eq-set a))
+            (conj result #{a}))))
+      #{}
+      D)))
+(if false
+  (eq-classes #(* % %) #{-2 -1 0 1 2}))
+;others
+#(set (map set (vals (set (group-by % %2))))) ;<< group-by
+(fn [f D] (set (map set (vals (group-by f D)))))
+(fn [f s]
+  (set (for [a s]
+         (set (for [b s :when (= (f a) (f b))] b)))))
+(fn [f s]
+  (->> (group-by f s)
+       (map second)
+       (map set)
+       set))
 
-
-
-
-
-
-
-
-
-
+;http://www.4clojure.com/problem/99 product digits
+(def prod-digits
+  (fn [one two]
+    (map
+      #(java.lang.Integer/parseInt (str %)) ; Can't pass Java static method e.g. java.lang.Integer/parseInt to map as a parameter!
+      (seq (str (* one two))))))
+(if false
+  (prod-digits 1 1))
+;others
+(fn [a b] (map #(- (int %) 48) (str (* a b)))) ; apply map directly to a string
+(fn [a b]
+   (->> (* a b)
+        str
+        (map str)
+        (map #(Integer/parseInt %))))
+#(map (comp read-string str) (str (* % %2))) ;<<<
+(fn [x y] (map #(Character/digit % 10) (str (* x y))))
+(fn [a b] (map #(- (int %) (int \0)) (str (* a b))))
 
 
 
