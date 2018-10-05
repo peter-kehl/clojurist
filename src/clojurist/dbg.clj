@@ -29,10 +29,10 @@
 
 ;BIG TODO: wrap everythin in with-out-str somehow, so it indents user's calls to print.
 ;TODO (time) - optional?
-(def dbg-indent-level (atom 0))
-(defn dbg>> [] (swap! dbg-indent-level #(inc %)))
-(defn dbg<< [] (swap! dbg-indent-level #(Math/max (dec %) 0))) ;TODO warn on negative?
-(defn dbg-indentation [] (repeat @dbg-indent-level "  "))
+(def dbg-indent-level 0)
+(defn dbg-indent [] (def dbg-indent-level (inc dbg-indent-level)))
+(defn dbg-unindent [] (def dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, and prevent further dbg-unindent reporting
+(defn dbg-indentation [] (repeat dbg-indent-level "  "))
 (defn dbg-format [str]
   (clojure.string/replace str "\n"#"\r?\n" (str (newline) (dbg-indentation)))) ;not using (newline) for the pattern, so that hard-coded new line character(s) work cross-platform.
 ;alternatively: (binding [*out* ...] (callback...)) or (def *out* ....)
@@ -61,6 +61,8 @@
       (dbg-print msg "Throwing from:" msg "throwable:" e)
       (throw e))))
     
+;https://clojure.org/guides/weird_characters
+; - every time a particular x# is used within a single syntax quote, the _same_ generated name will be used.
 
 (defmacro dbg [msgOrFun & others]
   (let [msg (if (string? msgOrFun)
