@@ -87,7 +87,7 @@
 ; - special forms and macros. Wrap them in #(...) of (fn [] ...)
 ; - keyword literals serving as accessor functions, for example (:i {:i 1}). For them, either
 ; --- insert a string literal message, or
-; --- insert ::_, followed by a keyword literal (to set a scope/reference for inner (dbg) calls) or ::_
+; --- insert :_, followed by a keyword literal (to set a scope/reference for inner (dbg) calls) or :_
 (defmacro dbg [msgOrFun & others]
   (let [msgIsGiven (or (string? msgOrFun) (keyword? msgOrFun))
         firstFun (if msgIsGiven
@@ -119,37 +119,36 @@
                        (str (nth &form 2)))
                      (str (nth &form 1))))
         fun-holder (gensym 'fun-holder)
-        scopeReferenceKeyword (if (and firstKeyword (not= firstKeyword ::_) secondKeyword) firstKeyword)
+        scopeReferenceKeyword (if (and firstKeyword (not= firstKeyword :_) secondKeyword) firstKeyword)
         scopeDefinitionKeyword (if firstKeyword
                                  (if secondKeyword
-                                   (if (not= secondKeyword ::_) secondKeyword)
-                                   (if (not= firstKeyword  ::_) firstKeyword)))]
+                                   (if (not= secondKeyword :_) secondKeyword)
+                                   (if (not= firstKeyword  :_) firstKeyword)))]
     (let [declare-binding (list 'binding ['dbg-indent-level (symbol (str dbg-snapshot-prefix scopeReferenceKeyword))])
           declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeDefinitionKeyword)) 'dbg-indent-level])
           execute (concat
                     (if (and
-                            (not (symbol? fun))
-                            dbg-show-function-forms)
-                        (list ;TODO
-                          (list 'dbg-println "Fn for:" msg "<-" fun-expr)))
+                             (not (symbol? fun))
+                             dbg-show-function-forms)
+                      (list 'dbg-println "Fn for:" msg "<-" fun-expr))
                     ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-call.
-                    (list ;TODO
+                    (list
                       (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
                         (if (seq args)
                           (list 'dbg-println "Args for:" msg))
                         (seq (apply conj ['dbg-call msg fun-holder] args)))))]
-     (concat
-       (if scopeReferenceKeyword 
-         (concat
-           declare-binding
-           (if scopeDefinitionKeyword
-             (list
-               (concat declare-let execute))
-             execute))
-             
-         (if scopeDefinitionKeyword
-           (concat declare-let execute)
-           (concat '(do) execute)))))))
+      (concat
+        (if scopeReferenceKeyword 
+          (concat
+            declare-binding
+            (if scopeDefinitionKeyword
+              (list
+                (concat declare-let execute))
+              execute))
+          
+          (if scopeDefinitionKeyword
+            (concat declare-let execute)
+            (concat '(do) execute)))))))
 
        
 (dbg + 1)
