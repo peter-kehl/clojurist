@@ -33,6 +33,7 @@
   (def ^:dynamic dbg-show-function-forms value))
 (dbg-show-function false)
 
+
 (def ^:dynamic dbg-indent-level 0)
 (defn dbg-indent [] (def ^:dynamic dbg-indent-level (inc dbg-indent-level)))
 (defn dbg-unindent [] (def ^:dynamic dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, but prevent further dbg-unindent reporting
@@ -77,7 +78,7 @@
 ; - without a message: (dbg function args...), (dbg (function-expr) args...)
 ; - with a message as a string literal:
 ; - with a message as a keyword literal - the
-;TODO snapshot indent level when called
+(def dbg-snapshot-prefix "dbg-snapshot")
 
 (defmacro dbg [msgOrFun & others]
   (let [msgIsGiven (or (string? msgOrFun) (keyword? msgOrFun))
@@ -110,7 +111,14 @@
                        (str (nth &form 2)))
                      (str (nth &form 1))))
         fun-holder (gensym 'fun-holder)]
-    (list 'do ; need (do) to honour any enclosing branches of e.g. (if)
+    (concat
+      (if (and msgKeyword (not secondKeyword))
+        (list 'let [(symbol (str dbg-snapshot-prefix msgKeyword) '(dbg-indentation))])
+        (if secondKeyword
+          (if (= secondKeyword :>)
+            (list 'binding ['dbg-indent-level (symbol (str dbg-snapshot-prefix msgKeyword))])
+            (throw (IllegalArgumentException. (str "Unrecognized second keyword " secondKeyword))))
+          '(do)))
       (if (not (symbol? fun))
         (list 'if dbg-show-function-forms 
           (list 'dbg-println "Fn for:" msg "<-" fun-expr)))
