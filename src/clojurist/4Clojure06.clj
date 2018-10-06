@@ -4,12 +4,6 @@
 ;to reload this file in REPL, run:
 ;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/4Clojure05.clj")
 
-;replacement for skipping the dbg, but only for forms with a string message: 
-;(defmacro dbg [& args] (rest &form))
-
-;macroexpand wants a quoted expression:
-;(macroexpand '(dbg ...))
-
 ;http://www.4clojure.com/problem/101 Levenshtein Distance
 ;alternating wide and deep:
 ;-wide: generation of 1-step change alternatives
