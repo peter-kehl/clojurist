@@ -90,10 +90,10 @@
 ; --- insert ::_, followed by a keyword literal (to set a scope/reference for inner (dbg) calls) or ::_
 (defmacro dbg [msgOrFun & others]
   (let [msgIsGiven (or (string? msgOrFun) (keyword? msgOrFun))
-        firstKeyword (if (keyword? msgOrFun) msgOrFun)
         firstFun (if msgIsGiven
                    nil
                    msgOrFun)
+        firstKeyword (if (keyword? msgOrFun) msgOrFun)
         secondKeyword (if (and
                                firstKeyword
                                (keyword? (first others)))
@@ -125,24 +125,21 @@
                                    (if (not= secondKeyword ::_) secondKeyword)
                                    (if (not= firstKeyword  ::_) firstKeyword)))]
     (concat
-      (if (and firstKeyword (not secondKeyword))
-        (list 'let [(symbol (str dbg-snapshot-prefix firstKeyword)) 'dbg-indent-level])
-        (if secondKeyword
-          (if (= secondKeyword :>)
-            (list 'binding ['dbg-indent-level (symbol (str dbg-snapshot-prefix firstKeyword))])
-            (if (= secondKeyword :_)
-              '(do)
-              (throw (IllegalArgumentException. (str "Unrecognized second keyword " secondKeyword)))))
-          '(do)))
-      (if (and (not (symbol? fun)) dbg-show-function-forms)
-        (list
-          (list 'dbg-println "Fn for:" msg "<-" fun-expr)))
-      ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-call.
+      (if scopeReferenceKeyword
+        (list 'binding ['dbg-indent-level (symbol (str dbg-snapshot-prefix scopeReferenceKeyword))])
+        ('do))
+      (if scopeDefinitionKeyword
+        (list 'let [(symbol (str dbg-snapshot-prefix scopeDefinitionKeyword)) 'dbg-indent-level])
+        '(do)))
+    (if (and (not (symbol? fun)) dbg-show-function-forms)
       (list
-        (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
-          (if (seq args)
-            (list 'dbg-println "Args for:" msg))
-          (seq (apply conj ['dbg-call msg fun-holder] args)))))))
+        (list 'dbg-println "Fn for:" msg "<-" fun-expr)))
+    ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-call.
+    (list
+      (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
+        (if (seq args)
+          (list 'dbg-println "Args for:" msg))
+        (seq (apply conj ['dbg-call msg fun-holder] args))))))
 
 ; TODO dbg>> for cross-thread keyword references
 ; TODO dbg-cfg macro
