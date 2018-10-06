@@ -124,23 +124,35 @@
                                  (if secondKeyword
                                    (if (not= secondKeyword ::_) secondKeyword)
                                    (if (not= firstKeyword  ::_) firstKeyword)))]
-    (concat
-      (if scopeReferenceKeyword
-        (list 'binding ['dbg-indent-level (symbol (str dbg-snapshot-prefix scopeReferenceKeyword))])
-        ('do))
-      (if scopeDefinitionKeyword
-        (list 'let [(symbol (str dbg-snapshot-prefix scopeDefinitionKeyword)) 'dbg-indent-level])
-        '(do)))
-    (if (and (not (symbol? fun)) dbg-show-function-forms)
-      (list
-        (list 'dbg-println "Fn for:" msg "<-" fun-expr)))
-    ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-call.
-    (list
-      (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
-        (if (seq args)
-          (list 'dbg-println "Args for:" msg))
-        (seq (apply conj ['dbg-call msg fun-holder] args))))))
+    (let [declare-binding (list 'binding ['dbg-indent-level (symbol (str dbg-snapshot-prefix scopeReferenceKeyword))])
+          declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeDefinitionKeyword)) 'dbg-indent-level])
+          execute (concat
+                    (if (and
+                            (not (symbol? fun))
+                            dbg-show-function-forms)
+                        (list ;TODO
+                          (list 'dbg-println "Fn for:" msg "<-" fun-expr)))
+                    ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-call.
+                    (list ;TODO
+                      (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
+                        (if (seq args)
+                          (list 'dbg-println "Args for:" msg))
+                        (seq (apply conj ['dbg-call msg fun-holder] args)))))]
+     (concat
+       (if scopeReferenceKeyword 
+         (concat
+           declare-binding
+           (if scopeDefinitionKeyword
+             (list
+               (concat declare-let execute))
+             execute))
+             
+         (if scopeDefinitionKeyword
+           (concat declare-let execute)
+           (concat '(do) execute)))))))
 
+       
+(dbg + 1)
 ; TODO dbg>> for cross-thread keyword references
 ; TODO dbg-cfg macro
 
