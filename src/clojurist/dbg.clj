@@ -38,14 +38,21 @@
 (def ^:dynamic dbg-indent-level 0)
 (defn dbg-indent [] (def ^:dynamic dbg-indent-level (inc dbg-indent-level)))
 (defn dbg-unindent [] (def ^:dynamic dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, but prevent further dbg-unindent reporting
-(defn dbg-indentation [] (repeat dbg-indent-level "  "))
-;TODO format the 1st line <- pass an arg indicating whether this is on a new line, or concatenated to the previous line
-(defn dbg-format [content]
-  (clojure.string/replace content #"\r?\n" (str (newline) (dbg-indentation)))) ;not using (newline) for the pattern, so that hard-coded new line character(s) work cross-platform.
+(defn dbg-indentation [] (apply str (repeat dbg-indent-level "  ")))
+;By default we do indent the first line, too. Pass false if it's to be concatenated with an existing content on its last line.
+(defn dbg-format
+  ([content] (dbg-format content true))
+  ([content indentFirstLine]
+   (let [indentedOtherLines (clojure.string/replace content "\n" (str "\n" (dbg-indentation)))]
+     (if indentFirstLine
+       (str (dbg-indentation) indentedOtherLines)
+       indentedOtherLines))))
 
 ;alternatively: (binding [*out* ...] (callback...)) or (def *out* ....)
 (defn dbg-print [& args]
-  (apply print (map dbg-format args)))
+  (print (dbg-format (reduce
+                       #(str % \space %2)
+                       "" args))))
 (defn dbg-println [& args]
   (apply dbg-print args)
   (println))
@@ -117,15 +124,15 @@
                 (second others)
                 (first others)))
         args (if (and
-                    (not (string? msgOrFun))
-                    (not (keyword? msgOrFun)))
+                      (not (string? msgOrFun))
+                      (not (keyword? msgOrFun)))
                others
                (if secondKeyword
                  (drop 2 others)
                  (rest others)))
         fun-expr (if (and
-                        (not (symbol? fun))
-                        (not (keyword? fun))) ;a keyword if accessing a map entry
+                          (not (symbol? fun))
+                          (not (keyword? fun))) ;a keyword if accessing a map entry
                    (if firstIsNotFunction
                      (if secondKeyword
                        (str (nth &form 3))
@@ -178,12 +185,42 @@
 ;replacement for skipping the dbg, but only for forms with a string message: 
 ;(defmacro dbg [& args] (rest &form))
 
-(defn inner [arg] 1)
-(defn outer []
-  (dbg :w->o + 1 (dbg :w->o :>in inner 4)))
+;(defn inner [arg] 1)
+;(defn outer []  (dbg :w->o + 1 (dbg :w->o :>in inner 4)))
 
 
+(dbg :out (fn[]
+            (println "out" dbg-indent-level)
+            (dbg :out :in (fn []
+                            (println "in" dbg-indent-level)
+                            (dbg :in :innermost #(println "innermost" dbg-indent-level))))))
 
+;(dbg :out (fn[] (println "out" dbg-indent-level) (dbg :out :in #(println "in" dbg-indent-level))))
+; vvvvvv
+#_
+(let*
+  [dbg-snapshot:out dbg-indent-level]
+  (let*
+    [fun-holder1043
+     (fn*
+       ([]
+        (println "out" dbg-indent-level)
+        (let*
+          []
+          (clojure.core/push-thread-bindings
+            (clojure.core/hash-map
+              #'dbg-indent-level
+              (+ dbg-snapshot:out 2)))
+          (try
+            (let*
+              [dbg-snapshot:in dbg-indent-level]
+              (let*
+                [fun-holder1044 #(println "in" dbg-indent-level)]
+                nil
+                (dbg-call :in fun-holder1044)))
+            (finally (clojure.core/pop-thread-bindings))))))]
+    nil
+    (dbg-call :out fun-holder1043)))
 
 
 
