@@ -54,21 +54,22 @@
     (print indented)))
 
 (defn dbg-call [msg fun & args]
-  (dbg-print "Call:" msg)
+  ; Here and in dbg macro: Don't use colon : in printout, because it doesn't look good if msg is a keyword.
+  (dbg-print "Call" msg)
   (if (seq args)
-    (do (println " with: ")
-        (dbg-pprint args))
+    (do (println " with ")
+      (dbg-pprint args))
     (println))
   (dbg-indent)
   (try
     (let [res (apply fun args)]
       (dbg-unindent)
-      (dbg-println "Return:" msg "value:")
+      (dbg-println "Return" msg "value:")
       (dbg-pprint res)
       res)
     (catch Throwable e
       (dbg-unindent)
-      (dbg-println msg "Throw:" msg "throwable:" e)
+      (dbg-println msg "Throw" msg "throwable:" e)
       (throw e))))
 
 ; If we need to treat a string into a symbol literal-compatible string. See https://clojure.org/reference/reader#_symbols
@@ -87,69 +88,78 @@
 
 ; Insert 'dbg' in front of most calls, except for:
 ; - special forms and macros. Wrap them in #(...) of (fn [] ...)
-; - keyword literals serving as accessor functions, for example (:i {:i 1}). For them, either
-; --- insert a string literal message, or
-; --- insert :_, followed by a keyword literal (to set a scope/reference for inner (dbg) calls) or :_
+; - keyword literal serving as an accessor function, for example (:i {:i 1}). For them, either
+; --- insert a string literal message (but not another keyword literal): (dbg ":i from a map" :i {:i 1}), or
+; --- insert :_, followed by a keyword literal (to set a scope/reference for inner (dbg) calls) or :_. For example
+;     (dbg :_ :i-from-a-map :i {:i 1}) or (dbg :_ :_ :i {:i 1})
+; It works with a symbol literal serving as an accessor function, for example ('i {'i 1}) => (dbg 'i {'i 1}).
+; (No need to insert anything in front of 'i).
 (defmacro dbg [msgOrFun & others]
-  (let [msgIsGiven (or (string? msgOrFun) (keyword? msgOrFun))
-        firstFun (if msgIsGiven
-                   nil
-                   msgOrFun)
-        firstKeyword (if (keyword? msgOrFun) msgOrFun)
+  (let [firstKeyword (if (keyword? msgOrFun) msgOrFun)
         secondKeyword (if (and
                                firstKeyword
                                (keyword? (first others)))
                         (first others))
+        msgAsGiven (or
+                       (and (string? msgOrFun) msgOrFun)
+                       (and (not= firstKeyword :_) (not secondKeyword) firstKeyword)
+                       (and (not= secondKeyword :_) secondKeyword))
+        ;firstIsNotFunction may be true even though msgAsGiven is nil, if keyword(s) are :_
+        ;Can't do negative check for firstIsNotFunction, because a function may be represented by a symbol or a list (to evaluate)
+        firstIsNotFunction (or (string? msgOrFun) (keyword? msgOrFun))
         ; "logical" (with a variable position among parameters):
-        msg (if msgIsGiven 
+        msg (or msgAsGiven (str &form)) ;without (str) the macro would inject the user's code unqouted
+        fun (if (not msgAsGiven)
               msgOrFun
-              (str &form)) ;without (str) the macro would inject the user's code unqouted
-        fun (if firstFun
-              firstFun
               (if secondKeyword
                 (second others)
                 (first others)))
-        args (if firstFun
+        args (if (and
+                    (not (string? msgOrFun))
+                    (not (keyword? msgOrFun)))
                others
                (if secondKeyword
                  (drop 2 others)
                  (rest others)))
-        fun-expr (if (and (not (symbol? fun)) (not (keyword? fun))) ;a keyword if accessing a map entry
-                   (if msgIsGiven
+        fun-expr (if (and
+                        (not (symbol? fun))
+                        (not (keyword? fun))) ;a keyword if accessing a map entry
+                   (if firstIsNotFunction
                      (if secondKeyword
                        (str (nth &form 3))
                        (str (nth &form 2)))
                      (str (nth &form 1))))
         fun-holder (gensym 'fun-holder)
-        scopeReferenceKeyword (if (and firstKeyword (not= firstKeyword :_) secondKeyword) firstKeyword)
-        scopeDefinitionKeyword (if firstKeyword
-                                 (if secondKeyword
-                                   (if (not= secondKeyword :_) secondKeyword)
-                                   (if (not= firstKeyword  :_) firstKeyword)))]
+        scopeBackReferenceKeyword (if (and firstKeyword (not= firstKeyword :_) secondKeyword)
+                                    firstKeyword)
+        scopeForwardDefinitionKeyword (if firstKeyword
+                                        (if secondKeyword
+                                          (if (not= secondKeyword :_) secondKeyword)
+                                          (if (not= firstKeyword  :_) firstKeyword)))]
     (let [declare-binding (list 'binding ['dbg-indent-level
-                                          (list 'inc (symbol (str dbg-snapshot-prefix scopeReferenceKeyword)))])
-          declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeDefinitionKeyword)) 'dbg-indent-level])
+                                          (list 'inc (symbol (str dbg-snapshot-prefix scopeBackReferenceKeyword)))])
+          declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeForwardDefinitionKeyword)) 'dbg-indent-level])
           execute (concat
                     (if (and
                              (not (symbol? fun))
                              dbg-show-function-forms)
-                      (list 'dbg-println "Fn for:" msg "<-" fun-expr))
+                      (list 'dbg-println "Fn for" msg "<-" fun-expr))
                     ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-call.
                     (list
                       (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
                         (if (seq args)
-                          (list 'dbg-println "Args for:" msg))
+                          (list 'dbg-println "Args for" msg))
                         (seq (apply conj ['dbg-call msg fun-holder] args)))))]
       (concat
-        (if scopeReferenceKeyword 
+        (if scopeBackReferenceKeyword 
           (concat
             declare-binding
-            (if scopeDefinitionKeyword
+            (if scopeForwardDefinitionKeyword
               (list
                 (concat declare-let execute))
               execute))
           
-          (if scopeDefinitionKeyword
+          (if scopeForwardDefinitionKeyword
             (concat declare-let execute)
             (concat '(do) execute)))))))
 
