@@ -39,8 +39,10 @@
 (defn dbg-indent [] (def ^:dynamic dbg-indent-level (inc dbg-indent-level)))
 (defn dbg-unindent [] (def ^:dynamic dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, but prevent further dbg-unindent reporting
 (defn dbg-indentation [] (repeat dbg-indent-level "  "))
+;TODO format the 1st line <- pass an arg indicating whether this is on a new line, or concatenated to the previous line
 (defn dbg-format [content]
   (clojure.string/replace content #"\r?\n" (str (newline) (dbg-indentation)))) ;not using (newline) for the pattern, so that hard-coded new line character(s) work cross-platform.
+
 ;alternatively: (binding [*out* ...] (callback...)) or (def *out* ....)
 (defn dbg-print [& args]
   (apply print (map dbg-format args)))
@@ -137,7 +139,10 @@
                                           (if (not= secondKeyword :_) secondKeyword)
                                           (if (not= firstKeyword  :_) firstKeyword)))]
     (let [declare-binding (list 'binding ['dbg-indent-level
-                                          (list 'inc (symbol (str dbg-snapshot-prefix scopeBackReferenceKeyword)))])
+                                          ;The following increases by 2 rather than by 1, because the outer dbg established
+                                          ;the forward definition let [] before it invoked dbg-call, which increased indentation by 1 level.
+                                          ;An alternative would be to increase/decrease indentation here in the macro - more complex!
+                                          (list '+ (symbol (str dbg-snapshot-prefix scopeBackReferenceKeyword)) 2)])
           declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeForwardDefinitionKeyword)) 'dbg-indent-level])
           execute (concat
                     (if (and
