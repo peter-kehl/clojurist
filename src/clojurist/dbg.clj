@@ -48,7 +48,7 @@
 (defn dbg-pprint-last [prefix obj]
   (dbg-print prefix (pretty obj)))
 
-;---- For (dbg...), which works with either functions, macros or special forms
+;---- For both dbg and dbgf.
 (defn dbg-call-before [msg & args]
   ; Here and in dbg-*: Don't add colon : to printout, because it doesn't look good if msg is a keyword.
   (let [call-msg (str "Call " msg)]
@@ -69,14 +69,14 @@
   (throw e))
   
 ;This is a macro and not a function, so we can use `dbg` with other macros/special forms.
-;Otherwise users may need to wrap code in #(...) or (fn [] ....). That not only adds a set of parenthesis.
+;Otherwise users may need to wrap code in #(...) or (fn [] ....). THowever, that not only adds a set of parenthesis.
 ;It also upsets any (recur...) from inner code (until https://dev.clojure.org/jira/browse/CLJ-2235).
-(defmacro dbg-call [msg & form]
+(defmacro dbg-call [msg & code]
   (list 'do
-    (concat `(dbg-call-before ~msg) args)
+    `(dbg-call-before ~msg)
     (list 'try
        (list
-          'let ['res (concat (list fun) args)]
+          'let ['res code]
           (list 'dbg-call-after msg 'res)
           'res)
        (list
@@ -86,22 +86,13 @@
 ; an alternative to dbg-call, but it only works with functions, not with macros/special forms
 (defn dbg-call-f [msg fun & args]
   ; Here and in dbg macro: Don't use colon : in printout, because it doesn't look good if msg is a keyword.
-  (let [call-msg (str "Call " msg)]
-    (if (seq args)
-      (dbg-pprint-last (str call-msg " with") args)
-      (dbg-print call-msg)))
-  (println)
-  (dbg-indent-plus)
+  (dbg-call-before msg args)
   (try
     (let [res (apply fun args)]
-      (dbg-indent-minus)
-      (dbg-pprint-last (str "From " msg " return") res)
-      (println)
+      (dbg-call-after msg res)
       res)
     (catch Throwable e
-      (dbg-indent-minus)
-      (dbg-println msg "Throw" msg "throwable:" e)
-      (throw e))))
+      (dbg-call-throw msg e))))
 
 ; If we need to treat a string into a symbol literal-compatible string. See https://clojure.org/reference/reader#_symbols
 
@@ -116,12 +107,10 @@
 
 ;TODO pprint of function expression < https://clojuredocs.org/clojure.pprint/pprint#example-5b950e6ce4b00ac801ed9e8a
 ; -- (clojure.pprint/with-pprint-dispatch clojure.pprint/code-dispatch (clojure.pprint/pprint (clojure.edn/read-string "code-as-string-here") ))
-
 ; Insert `dbg "description"` before function calls, like
 ; `(dbg "+ on numbers" + 1 2)`
 ; Beware of lazy sequences when tracing errors: for example, (for) creates a lazy sequence, hence callbacks will be delayed
-
-; Insert 'dbg' in front of most calls, except for:
+; Details: Insert 'dbg' in front of most calls, except for:
 ; - special forms and macros. Wrap them in #(...) of (fn [] ...)
 ; - keyword literal serving as an accessor function, for example (:i {:i 1}). For them, either
 ; --- insert a string literal message (but not another keyword literal): (dbg ":i from a map" :i {:i 1}), or
@@ -178,13 +167,62 @@
                     (if (and
                              (not (symbol? fun))
                              dbg-show-function-forms)
-                      (list 'dbg-println "Fn for" msg "<-" fun-expr))
-                    ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-callf.
+                      (list 'dbg-println "Fn for" msg "<-" fun-expr)) ;dbg-println here helps us identify evaluation of the function-generating expression from running the function itself.
+                    ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-call-f.
                     (list
                       (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
                         (if (seq args)
                           (list 'dbg-println "Args for" msg))
-                        (seq (apply conj ['dbg-callf msg fun-holder] args)))))]
+                        (seq (apply conj ['dbg-call-f msg fun-holder] args)))))]
+      (concat
+        (if scopeBackReferenceKeyword 
+          (concat
+            declare-binding
+            (if scopeForwardDefinitionKeyword
+              (list
+                (concat declare-let execute))
+              execute))
+          
+          (if scopeForwardDefinitionKeyword
+            (concat declare-let execute)
+            (concat '(do) execute)))))))
+
+;TODO put in a separate file, so it's comparable to dbgf
+; Like dbg, but this works with either functions, macros or special forms. However, it doesn't print any arguments.
+(defmacro dbg [msgOrFun & others]
+  (let [firstKeyword (if (keyword? msgOrFun) msgOrFun)
+        secondKeyword (if (and
+                               firstKeyword
+                               (keyword? (first others)))
+                        (first others))
+        msgAsGiven (or
+                       (and (string? msgOrFun) msgOrFun)
+                       (and (not= firstKeyword :_) (not secondKeyword) firstKeyword)
+                       (and (not= secondKeyword :_) secondKeyword))
+        ;firstIsNotFunction may be true even though msgAsGiven is nil, if keyword(s) are :_
+        ;Can't do negative check for firstIsNotFunction, because a function may be represented by a symbol or a list (to evaluate)
+        firstIsNotFunction (or (string? msgOrFun) (keyword? msgOrFun))
+        ; "logical" (with a variable position among parameters):
+        msg (or msgAsGiven (str &form)) ;without (str) the macro would inject the user's code unqouted
+        code (if (and
+                      (not (string? msgOrFun))
+                      (not (keyword? msgOrFun)))
+               (drop 1 &form)
+               (if secondKeyword
+                 (drop 1 others)
+                 others))
+        scopeBackReferenceKeyword (if (and firstKeyword (not= firstKeyword :_) secondKeyword)
+                                    firstKeyword)
+        scopeForwardDefinitionKeyword (if firstKeyword
+                                        (if secondKeyword
+                                          (if (not= secondKeyword :_) secondKeyword)
+                                          (if (not= firstKeyword  :_) firstKeyword)))]
+    (let [declare-binding (list 'binding ['dbg-indent-level
+                                          (list 'inc (symbol (str dbg-snapshot-prefix scopeBackReferenceKeyword)))])
+          declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeForwardDefinitionKeyword)) 'dbg-indent-level])
+          execute (concat
+                    (list
+                      (seq (apply conj ['dbg-call msg] code))))]
       (concat
         (if scopeBackReferenceKeyword 
           (concat
@@ -226,6 +264,9 @@
                (dbg :out :in (fn []
                                #_(println "in" dbg-indent-level)
                                (dbg :in :innermost #(println "innermost" dbg-indent-level)))))))
+
+(if false
+  (dbg :let let [i 1] i))
 
 (if false
   (dbg :out (fn[])
