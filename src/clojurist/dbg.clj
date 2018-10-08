@@ -1,32 +1,7 @@
 (require 'clojure.pprint)
-
-(defmacro practice-small-debug-macro [msg body]
- `(let [val# ~body]
-   (println "DEBUG (MSG): " ~msg)
-   (println "DEBUG (RET): " val#)
-   val#))
-
-(defmacro practice-use-form [s]
-  (let [f (str &form)]
-    `(let [s# ~s] (str s# ~f s#))))
-; insert `trace "description"` before function calls, like
-; (trace "+ on numbers" + 1 2)
-; Unfortunately, that disables compile time validation of number of parameters, so if functions/calls change,
-; to validate them remove `trace "message", compile, re-add trace "message" back if need be.
-; Beware when tracing errors: (for) creates a lazy sequence, hence callbacks will be delayed
-(defn trace [msg f & args]
-  ((print "Calling" msg "with ")   
-   (clojure.pprint/pprint args)
-   (try
-     (let [res (apply f args)]
-       (print msg "returning ")
-       (clojure.pprint/pprint res)
-       res)
-     (catch Throwable e
-       (print msg "threw" e)
-       (throw e)))))
  
 ;TODO How to ensure the file is loaded as the first (or before a set of files), so that it re-defines 'fn' macro for them?
+; -> future: redefine defn, fn
 
 ;BIG TODO: wrap everythin in with-out-str somehow, so it indents user's calls to print.
 ;TODO (time) - optional?
@@ -36,12 +11,13 @@
 
 
 (def ^:dynamic dbg-indent-level 0)
-(defn dbg-indent [] (def ^:dynamic dbg-indent-level (inc dbg-indent-level)))
-(defn dbg-unindent [] (def ^:dynamic dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, but prevent further dbg-unindent reporting
+(defn dbg-indent-plus [] (println :indent-plus) (def ^:dynamic dbg-indent-level (inc dbg-indent-level)))
+(defn dbg-indent-minus [] (println :indent-minus)(def ^:dynamic dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, but prevent further dbg-unindent reporting
 (defn dbg-indentation [] (apply str (repeat dbg-indent-level "  ")))
-;By default we do indent the first line, too. Pass false if it's to be concatenated with an existing content on its last line.
-(defn dbg-format
-  ([content] (dbg-format content true))
+
+;By default we don't indent the first line, so it can be appended to an existing content.
+(defn dbg-indent
+  ([content] (dbg-indent content false))
   ([content indentFirstLine]
    (let [indentedOtherLines (clojure.string/replace content "\n" (str "\n" (dbg-indentation)))]
      (if indentFirstLine
@@ -50,34 +26,41 @@
 
 ;alternatively: (binding [*out* ...] (callback...)) or (def *out* ....)
 (defn dbg-print [& args]
-  (print (dbg-format (reduce
-                       #(str % \space %2)
-                       "" args))))
+  (print (dbg-indent
+           (reduce
+             #(str % \space %2)
+             "" args)
+           true)))
 (defn dbg-println [& args]
   (apply dbg-print args)
-  (println))
-; clojure.pprint/pprint appends a line after
-(defn dbg-pprint [obj]
-  (let [unindented (with-out-str (clojure.pprint/pprint obj))
-        indented (dbg-format unindented)]
-    (print indented)))
+  (println)) ;Don't append "\n" to args of dbg-print, because it calls dbg-indent which removes a trailing newline.
 
+; A helper to capture output of clojure.pprint/pprint. Remove an extra newline at the end.
+(defn pretty [obj]
+  ;Good that Clojure regex doesn't use Java Regex MULTILINE-like "m?" by default, because we want to exclude the last line only
+  (clojure.string/replace (with-out-str (clojure.pprint/pprint obj)) #"\n$" ""))
+
+;TODO Print long or multi-line obj starting on a separate line
+; Unlike clojure.pprint/pprint, this does *not* append a newline.
+(defn dbg-pprint-last [prefix obj]
+  (dbg-print prefix (pretty obj)))
+  
 (defn dbg-call [msg fun & args]
   ; Here and in dbg macro: Don't use colon : in printout, because it doesn't look good if msg is a keyword.
-  (dbg-print "Call" msg)
-  (if (seq args)
-    (do (println " with ")
-      (dbg-pprint args))
-    (println))
-  (dbg-indent)
+  (let [call-msg (str "Call " msg)]
+    (if (seq args)
+      (dbg-pprint-last (str call-msg " with ") args)
+      (dbg-print call-msg)))
+  (println)
+  (dbg-indent-plus)
   (try
     (let [res (apply fun args)]
-      (dbg-unindent)
-      (dbg-println "Return" msg "value:")
-      (dbg-pprint res)
+      (dbg-indent-minus)
+      (dbg-pprint-last (str "Return " msg " value ") res)
+      (println)
       res)
     (catch Throwable e
-      (dbg-unindent)
+      (dbg-indent-minus)
       (dbg-println msg "Throw" msg "throwable:" e)
       (throw e))))
 
@@ -94,6 +77,14 @@
 
 ;TODO pprint of function expression < https://clojuredocs.org/clojure.pprint/pprint#example-5b950e6ce4b00ac801ed9e8a
 ; -- (clojure.pprint/with-pprint-dispatch clojure.pprint/code-dispatch (clojure.pprint/pprint (clojure.edn/read-string "code-as-string-here") ))
+
+; TODO (part of) dbg-call to be a macro -> args validation
+; insert `dbg "description"` before function calls, like
+; `(dbg "+ on numbers" + 1 2)`
+; Unfortunately, that disables compile time validation of number of parameters.
+; Hence if function signatures and/or their calls change,
+; to validate them you need to remove `dbg "message"` or comment out with #_ prefix and re-run. (Then re-add `dbg "message"` back if need be).
+; Beware of lazy sequences when tracing errors: for example, (for) creates a lazy sequence, hence callbacks will be delayed
 
 ; Insert 'dbg' in front of most calls, except for:
 ; - special forms and macros. Wrap them in #(...) of (fn [] ...)
@@ -185,42 +176,15 @@
 ;replacement for skipping the dbg, but only for forms with a string message: 
 ;(defmacro dbg [& args] (rest &form))
 
-;(defn inner [arg] 1)
-;(defn outer []  (dbg :w->o + 1 (dbg :w->o :>in inner 4)))
-
-
 (dbg :out (fn[]
             (println "out" dbg-indent-level)
             (dbg :out :in (fn []
                             (println "in" dbg-indent-level)
                             (dbg :in :innermost #(println "innermost" dbg-indent-level))))))
-
-;(dbg :out (fn[] (println "out" dbg-indent-level) (dbg :out :in #(println "in" dbg-indent-level))))
-; vvvvvv
-#_
-(let*
-  [dbg-snapshot:out dbg-indent-level]
-  (let*
-    [fun-holder1043
-     (fn*
-       ([]
-        (println "out" dbg-indent-level)
-        (let*
-          []
-          (clojure.core/push-thread-bindings
-            (clojure.core/hash-map
-              #'dbg-indent-level
-              (+ dbg-snapshot:out 2)))
-          (try
-            (let*
-              [dbg-snapshot:in dbg-indent-level]
-              (let*
-                [fun-holder1044 #(println "in" dbg-indent-level)]
-                nil
-                (dbg-call :in fun-holder1044)))
-            (finally (clojure.core/pop-thread-bindings))))))]
-    nil
-    (dbg-call :out fun-holder1043)))
+(if false
+  (dbg :out (fn[])
+    (println "out" dbg-indent-level)
+    (dbg :out :in #(println "in" dbg-indent-level))))
 
 
 
