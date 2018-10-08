@@ -11,8 +11,8 @@
 
 
 (def ^:dynamic dbg-indent-level 0)
-(defn dbg-indent-plus [] (println :indent-plus) (def ^:dynamic dbg-indent-level (inc dbg-indent-level)))
-(defn dbg-indent-minus [] (println :indent-minus)(def ^:dynamic dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, but prevent further dbg-unindent reporting
+(defn dbg-indent-plus [] (def ^:dynamic dbg-indent-level (inc dbg-indent-level)))
+(defn dbg-indent-minus [] (def ^:dynamic dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, but prevent further dbg-unindent reporting
 (defn dbg-indentation [] (apply str (repeat dbg-indent-level "  ")))
 
 ;By default we don't indent the first line, so it can be appended to an existing content.
@@ -28,7 +28,9 @@
 (defn dbg-print [& args]
   (print (dbg-indent
            (reduce
-             #(str % \space %2)
+             #(if (= % "")
+                  %2
+                  (str % \space %2))
              "" args)
            true)))
 (defn dbg-println [& args]
@@ -41,6 +43,7 @@
   (clojure.string/replace (with-out-str (clojure.pprint/pprint obj)) #"\n$" ""))
 
 ;TODO Print long or multi-line obj starting on a separate line
+;Print prefix, a space, and pretified obj.
 ; Unlike clojure.pprint/pprint, this does *not* append a newline.
 (defn dbg-pprint-last [prefix obj]
   (dbg-print prefix (pretty obj)))
@@ -49,14 +52,14 @@
   ; Here and in dbg macro: Don't use colon : in printout, because it doesn't look good if msg is a keyword.
   (let [call-msg (str "Call " msg)]
     (if (seq args)
-      (dbg-pprint-last (str call-msg " with ") args)
+      (dbg-pprint-last (str call-msg " with") args)
       (dbg-print call-msg)))
   (println)
   (dbg-indent-plus)
   (try
     (let [res (apply fun args)]
       (dbg-indent-minus)
-      (dbg-pprint-last (str "Return " msg " value ") res)
+      (dbg-pprint-last (str "From " msg " return") res)
       (println)
       res)
     (catch Throwable e
@@ -81,9 +84,6 @@
 ; TODO (part of) dbg-call to be a macro -> args validation
 ; insert `dbg "description"` before function calls, like
 ; `(dbg "+ on numbers" + 1 2)`
-; Unfortunately, that disables compile time validation of number of parameters.
-; Hence if function signatures and/or their calls change,
-; to validate them you need to remove `dbg "message"` or comment out with #_ prefix and re-run. (Then re-add `dbg "message"` back if need be).
 ; Beware of lazy sequences when tracing errors: for example, (for) creates a lazy sequence, hence callbacks will be delayed
 
 ; Insert 'dbg' in front of most calls, except for:
@@ -92,8 +92,8 @@
 ; --- insert a string literal message (but not another keyword literal): (dbg ":i from a map" :i {:i 1}), or
 ; --- insert :_, followed by a keyword literal (to set a scope/reference for inner (dbg) calls) or :_. For example
 ;     (dbg :_ :i-from-a-map :i {:i 1}) or (dbg :_ :_ :i {:i 1})
-; It works with a symbol literal serving as an accessor function, for example ('i {'i 1}) => (dbg 'i {'i 1}).
-; (No need to insert anything in front of 'i).
+; No need to insert anything in front of a symbol literal serving as an accessor function.
+; For example ('i {'i 1}) => (dbg 'i {'i 1}).
 (defmacro dbg [msgOrFun & others]
   (let [firstKeyword (if (keyword? msgOrFun) msgOrFun)
         secondKeyword (if (and
@@ -137,10 +137,7 @@
                                           (if (not= secondKeyword :_) secondKeyword)
                                           (if (not= firstKeyword  :_) firstKeyword)))]
     (let [declare-binding (list 'binding ['dbg-indent-level
-                                          ;The following increases by 2 rather than by 1, because the outer dbg established
-                                          ;the forward definition let [] before it invoked dbg-call, which increased indentation by 1 level.
-                                          ;An alternative would be to increase/decrease indentation here in the macro - more complex!
-                                          (list '+ (symbol (str dbg-snapshot-prefix scopeBackReferenceKeyword)) 2)])
+                                          (list 'inc (symbol (str dbg-snapshot-prefix scopeBackReferenceKeyword)))])
           declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeForwardDefinitionKeyword)) 'dbg-indent-level])
           execute (concat
                     (if (and
@@ -176,17 +173,22 @@
 ;replacement for skipping the dbg, but only for forms with a string message: 
 ;(defmacro dbg [& args] (rest &form))
 
-(dbg :out (fn[]
-            (println "out" dbg-indent-level)
-            (dbg :out :in (fn []
-                            (println "in" dbg-indent-level)
-                            (dbg :in :innermost #(println "innermost" dbg-indent-level))))))
+(if false
+   (dbg :out (fn[]
+               (dbg :out :in (fn []
+                               #_(println "in" dbg-indent-level)
+                               (dbg :in :innermost #(println "innermost" dbg-indent-level)))))))
 (if false
   (dbg :out (fn[])
     (println "out" dbg-indent-level)
     (dbg :out :in #(println "in" dbg-indent-level))))
-
-
+(if false
+  (defn arity-test [[one two]])
+  (if false (arity-test 0))) ;function arity checks are only done when evaluating
+;but symbols are checked when compiling:
+#_(if false (missing-function))
+#_(if false (#(missing-function)))
+(if false ((fn [par]) #_missing_par))
 
 
 
