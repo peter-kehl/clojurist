@@ -47,7 +47,10 @@
 ; Unlike clojure.pprint/pprint, this does *not* append a newline.
 (defn dbg-pprint-last [prefix obj]
   (dbg-print prefix (pretty obj)))
-  
+
+;TODO consider as a macro and helper functions, so we can use `dbg` with other macros/special forms.
+;Otherwise users may need to wrap code in #(...) or (fn [] ....). That not only adds a set of parenthesis.
+;It also upsets any (recur...) from inner code (until https://dev.clojure.org/jira/browse/CLJ-2235).
 (defn dbg-call [msg fun & args]
   ; Here and in dbg macro: Don't use colon : in printout, because it doesn't look good if msg is a keyword.
   (let [call-msg (str "Call " msg)]
@@ -81,8 +84,7 @@
 ;TODO pprint of function expression < https://clojuredocs.org/clojure.pprint/pprint#example-5b950e6ce4b00ac801ed9e8a
 ; -- (clojure.pprint/with-pprint-dispatch clojure.pprint/code-dispatch (clojure.pprint/pprint (clojure.edn/read-string "code-as-string-here") ))
 
-; TODO (part of) dbg-call to be a macro -> args validation
-; insert `dbg "description"` before function calls, like
+; Insert `dbg "description"` before function calls, like
 ; `(dbg "+ on numbers" + 1 2)`
 ; Beware of lazy sequences when tracing errors: for example, (for) creates a lazy sequence, hence callbacks will be delayed
 
@@ -93,7 +95,7 @@
 ; --- insert :_, followed by a keyword literal (to set a scope/reference for inner (dbg) calls) or :_. For example
 ;     (dbg :_ :i-from-a-map :i {:i 1}) or (dbg :_ :_ :i {:i 1})
 ; No need to insert anything in front of a symbol literal serving as an accessor function.
-; For example ('i {'i 1}) => (dbg 'i {'i 1}).
+; For example ('i {'i 1}) => (dbg 'i {'i 1}). (Plus, any function names are also symbols, and we want them to work intuitively.)
 (defmacro dbg [msgOrFun & others]
   (let [firstKeyword (if (keyword? msgOrFun) msgOrFun)
         secondKeyword (if (and
@@ -163,6 +165,13 @@
             (concat declare-let execute)
             (concat '(do) execute)))))))
 
+(defmacro dbg-scope [scope-keyword invoke & args]
+  (assert (keyword? scope-keyword) "scope-keyword must be a keyword")
+  (list
+    'let [(symbol (str dbg-snapshot-prefix scope-keyword)) 'dbg-indent-level]
+    (cons invoke args)))
+          
+  
 ; TODO dbg>> for cross-thread keyword references
 ; TODO dbg-cfg macro
 
