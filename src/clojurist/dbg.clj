@@ -29,8 +29,8 @@
   (print (dbg-indent
            (reduce
              #(if (= % "")
-                  %2
-                  (str % \space %2))
+                %2
+                (str % \space %2))
              "" args)
            true)))
 (defn dbg-println [& args]
@@ -48,10 +48,43 @@
 (defn dbg-pprint-last [prefix obj]
   (dbg-print prefix (pretty obj)))
 
-;TODO consider as a macro and helper functions, so we can use `dbg` with other macros/special forms.
+;---- For (dbg...), which works with either functions, macros or special forms
+(defn dbg-call-before [msg & args]
+  ; Here and in dbg-*: Don't add colon : to printout, because it doesn't look good if msg is a keyword.
+  (let [call-msg (str "Call " msg)]
+    (if (seq args)
+      (dbg-pprint-last (str call-msg " with") args)
+      (dbg-print call-msg)))
+  (println)
+  (dbg-indent-plus))
+
+(defn dbg-call-after [msg res]
+  (dbg-indent-minus)
+  (dbg-pprint-last (str "From " msg " return") res)
+  (println))
+
+(defn dbg-call-throw [msg e]
+  (dbg-indent-minus)
+  (dbg-println msg "Throw" msg "throwable:" e)
+  (throw e))
+  
+;This is a macro and not a function, so we can use `dbg` with other macros/special forms.
 ;Otherwise users may need to wrap code in #(...) or (fn [] ....). That not only adds a set of parenthesis.
 ;It also upsets any (recur...) from inner code (until https://dev.clojure.org/jira/browse/CLJ-2235).
-(defn dbg-call [msg fun & args]
+(defmacro dbg-call [msg & form]
+  (list 'do
+    (concat `(dbg-call-before ~msg) args)
+    (list 'try
+       (list
+          'let ['res (concat (list fun) args)]
+          (list 'dbg-call-after msg 'res)
+          'res)
+       (list
+          'catch 'Throwable 'e
+          (list 'dbg-call-throw msg 'e)))))
+
+; an alternative to dbg-call, but it only works with functions, not with macros/special forms
+(defn dbg-call-f [msg fun & args]
   ; Here and in dbg macro: Don't use colon : in printout, because it doesn't look good if msg is a keyword.
   (let [call-msg (str "Call " msg)]
     (if (seq args)
@@ -96,7 +129,7 @@
 ;     (dbg :_ :i-from-a-map :i {:i 1}) or (dbg :_ :_ :i {:i 1})
 ; No need to insert anything in front of a symbol literal serving as an accessor function.
 ; For example ('i {'i 1}) => (dbg 'i {'i 1}). (Plus, any function names are also symbols, and we want them to work intuitively.)
-(defmacro dbg [msgOrFun & others]
+(defmacro dbgf [msgOrFun & others]
   (let [firstKeyword (if (keyword? msgOrFun) msgOrFun)
         secondKeyword (if (and
                                firstKeyword
@@ -146,12 +179,12 @@
                              (not (symbol? fun))
                              dbg-show-function-forms)
                       (list 'dbg-println "Fn for" msg "<-" fun-expr))
-                    ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-call.
+                    ;no need to pre-eval the function expression to call, because that is done as a part of calling dbg-callf.
                     (list
                       (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
                         (if (seq args)
                           (list 'dbg-println "Args for" msg))
-                        (seq (apply conj ['dbg-call msg fun-holder] args)))))]
+                        (seq (apply conj ['dbg-callf msg fun-holder] args)))))]
       (concat
         (if scopeBackReferenceKeyword 
           (concat
@@ -165,6 +198,7 @@
             (concat declare-let execute)
             (concat '(do) execute)))))))
 
+; Create a scope that you can refer to from dbg or dbgf. This works with either a function, a macro or a special form.
 (defmacro dbg-scope [scope-keyword invoke & args]
   (assert (keyword? scope-keyword) "scope-keyword must be a keyword")
   (list
@@ -180,13 +214,19 @@
 ; 2. (clojure.pprint/with-pprint-dispatch clojure.pprint/code-dispatch (clojure.pprint/pprint 'generated-code-here ))
 
 ;replacement for skipping the dbg, but only for forms with a string message: 
-;(defmacro dbg [& args] (rest &form))
+;(defmacro dbg [one & others] (rest &form))
 
+(if false
+   (dbgf :out (fn[]
+                (dbgf :out :in (fn []
+                                 #_(println "in" dbg-indent-level)
+                                 (dbgf :in :innermost #(println "innermost" dbg-indent-level)))))))
 (if false
    (dbg :out (fn[]
                (dbg :out :in (fn []
                                #_(println "in" dbg-indent-level)
                                (dbg :in :innermost #(println "innermost" dbg-indent-level)))))))
+
 (if false
   (dbg :out (fn[])
     (println "out" dbg-indent-level)
