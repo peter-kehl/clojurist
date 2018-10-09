@@ -1,6 +1,5 @@
 (require 'clojure.set)
 (require 'clojure.pprint)
-(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
 
 ;to reload this file in REPL, run:
 ;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/4Clojure05.clj")
@@ -101,54 +100,52 @@
       ; Once you find one result, remove all candidates that would take same number of steps or more.
       ; Repeat until all candidates reach (and obviously have same number of steps).
       
-      (loop [priority (sorted-set-by compare-full [[from 0]])
-             backlog (sorted-set-by compare-full)
-             best-num-changes nil]
+      (dbgloop [priority (sorted-set-by compare-full [[from 0]])
+                backlog (sorted-set-by compare-full)
+                best-num-changes nil]
         ;best-num-changes is non-nil only once we have (any) results
-        (dbg :leven-loop
-          (fn []
-             (validate-queue priority
-               (validate-queue backlog))
-             (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
-               (second (first priority))
-               (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.05)))
-                 (recur (into priority backlog) (empty backlog) best-num-changes) ;<<<
-                 (let [priority-moved (#_dbg #_"into->priority-moved" into (#_dbg #_"empty priority" empty priority)
-                                        (dbg next-generation priority)) ;<<<
-                       _ (validate-queue priority-moved)
-                       priority-moved-results (filter (fn [cand _] (= cand to)) priority-moved)
-                       _ (validate-queue priority-moved-results)
-                       ;priority-moved-results-nums (map (fn [_ num-changes] num-changes))
-                       priority-moved-best-num-changes (if (seq priority-moved-results)
-                                                         (apply min (map (fn [_ num-changes] num-changes) priority-moved-results))
-                                                         nil)
-                       _ (validate-queue priority-moved-best-num-changes)
-                       best-num (if best-num-changes
-                                  (if priority-moved-best-num-changes
-                                    (min best-num-changes priority-moved-best-num-changes)
-                                    best-num-changes)
-                                  priority-moved-best-num-changes)
-                       priority-moved-unreached (disj priority-moved priority-moved-results)
-                       _ (validate-queue priority-moved-unreached)
-                       candidates-to-keep (fn [candidates]
-                                            (if best-num
-                                              (into (empty priority)
-                                                (filter (fn [_ num-changes] (< num-changes best-num))
-                                                  candidates))
-                                              candidates))
-                       _ (validate-queue candidates-to-keep)
-                       priority-keep   (candidates-to-keep priority-moved-unreached)
-                       _ (validate-queue priority-keep)
-                       backlog-keep (candidates-to-keep backlog)
-                       _ (validate-queue priority-keep)]
-                   #_TODO-merge-previous-and-following-let
-                   (let [priority-next-count (int (* (count priority-keep) 0.10))
-                         priority-next (take priority-next-count priority-keep)
-                         _ (validate-queue priority-next)
-                         backlog-next  (into backlog-keep (drop priority-next-count priority-keep))
-                         _ (validate-queue backlog-next)]
-                     
-                     (recur priority-next backlog-next best-num))))))))))) ;<<<
+        (validate-queue priority
+          (validate-queue backlog))
+        (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
+          (second (first priority))
+          (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.05)))
+            (recur (into priority backlog) (empty backlog) best-num-changes) ;<<<
+            (let [priority-moved (#_dbg #_"into->priority-moved" into (#_dbg #_"empty priority" empty priority)
+                                   (dbg next-generation priority)) ;<<<
+                  _ (validate-queue priority-moved)
+                  priority-moved-results (filter (fn [cand _] (= cand to)) priority-moved)
+                  _ (validate-queue priority-moved-results)
+                  ;priority-moved-results-nums (map (fn [_ num-changes] num-changes))
+                  priority-moved-best-num-changes (if (seq priority-moved-results)
+                                                    (apply min (map (fn [_ num-changes] num-changes) priority-moved-results))
+                                                    nil)
+                  _ (validate-queue priority-moved-best-num-changes)
+                  best-num (if best-num-changes
+                             (if priority-moved-best-num-changes
+                               (min best-num-changes priority-moved-best-num-changes)
+                               best-num-changes)
+                             priority-moved-best-num-changes)
+                  priority-moved-unreached (disj priority-moved priority-moved-results)
+                  _ (validate-queue priority-moved-unreached)
+                  candidates-to-keep (fn [candidates]
+                                       (if best-num
+                                         (into (empty priority)
+                                           (filter (fn [_ num-changes] (< num-changes best-num))
+                                             candidates))
+                                         candidates))
+                  _ (validate-queue candidates-to-keep)
+                  priority-keep   (candidates-to-keep priority-moved-unreached)
+                  _ (validate-queue priority-keep)
+                  backlog-keep (candidates-to-keep backlog)
+                  _ (validate-queue priority-keep)]
+              #_TODO-merge-previous-and-following-let
+              (let [priority-next-count (int (* (count priority-keep) 0.10))
+                    priority-next (take priority-next-count priority-keep)
+                    _ (validate-queue priority-next)
+                    backlog-next  (into backlog-keep (drop priority-next-count priority-keep))
+                    _ (validate-queue backlog-next)]
+                
+                (dbgrecur priority-next backlog-next best-num))))))))) ;<<<
 (if false
   (leven "kitten" "sitting"))
 ;get for ordered set/map returns an *existing* entry, not the given key:

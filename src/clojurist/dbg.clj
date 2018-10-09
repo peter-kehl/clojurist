@@ -106,7 +106,8 @@
 (def dbg-snapshot-prefix "dbg-snapshot")
 
 ;TODO pprint of function expression < https://clojuredocs.org/clojure.pprint/pprint#example-5b950e6ce4b00ac801ed9e8a
-; -- (clojure.pprint/with-pprint-dispatch clojure.pprint/code-dispatch (clojure.pprint/pprint (clojure.edn/read-string "code-as-string-here") ))
+; -- (clojure.pprint/with-pprint-dispatch clojure.pprint/code-dispatch (clojure.pprint/pprint (clojure.edn/read-string
+;     "code-as-string-here"  )))
 ; Insert `dbg "description"` before function calls, like
 ; `(dbg "+ on numbers" + 1 2)`
 ; Beware of lazy sequences when tracing errors: for example, (for) creates a lazy sequence, hence callbacks will be delayed
@@ -286,6 +287,7 @@
 ; --- create new functions with unique names
 ; --- define 'recur as a locally-bound function, that calls the user-created function (i.e. non-tail recursion).
 ; However, dbgr doesn't support letfn - too complicated (would you like to fork and implement that?). It can't support recur within #(), because hanling of #() can't ve overriden.
+; --- put comments on separate lines, to allow merging
 ; Copy (re-indented) of original Clojure 1.10 implementations
 ; (https://github.com/clojure/clojure/blob/master/src/clj/clojure/core.clj):
 ; TODO fork from CLJ; branch; remove other macros/functions, add own namespace - then merge their upstream changes
@@ -348,17 +350,17 @@
                                     (str "Invalid signature " sig
                                       " should be a list")))))
                      conds (when (and (next body) (map? (first body))) 
-                                 (first body))
+                             (first body))
                      body (if conds (next body) body)
                      conds (or conds (meta params))
                      pre (:pre conds)
                      post (:post conds)                       
                      body (if post
                             `((let [~'% ~(if (< 1 (count body)) 
-                                             `(do ~@body) 
+                                           `(do ~@body) 
                                            (first body))]
-                               ~@(map (fn* [c] `(assert ~c)) post)
-                               ~'%))
+                                 ~@(map (fn* [c] `(assert ~c)) post)
+                                 ~'%))
                             body)
                      body (if pre
                             (concat (map (fn* [c] `(assert ~c)) pre) 
@@ -381,6 +383,13 @@
         (when more
            (list* `assert-args more)))))
 
+; From @seancorfield on Clojurians slack:
+;  it doesn't use the result of calling `destructure` if that returns something other than its input argument.
+; So the `bindings` being used in the code above would be the _original_ bindings, including the destructuring forms...
+; ...so those won't be symbols, e.g., `(loop [a 1 {:keys [x y]} input] ...)`
+; Here `a` is a `symbol?` but `{:keys [x y]}` is not.
+; so you get a binding vector that has `[... g__123 input {:keys [x y]} g__123 ...]`
+; -- in other words, it delegates the actual destructuring to the expanded code.
 (defmacro loop-orig
   "Evaluates the exprs in a lexical context in which the symbols in
   the binding-forms are bound to their respective init-exprs or parts
@@ -398,7 +407,9 @@
             gs (map (fn [b] (if (symbol? b) b (gensym))) bs)
             bfs (reduce (fn [ret [b v g]] ;in CLJ source this used reduce1
                           (if (symbol? b)
+                            ;g is the formal & given parameter name
                             (conj ret g v)
+                            ;g is the formal, but generated, parameter name
                             (conj ret g v b g)))
                   [] (map vector bs vs gs))]
         `(let ~bfs
@@ -406,6 +417,87 @@
                (let ~(vec (interleave bs gs))
                   ~@body)))))))
 
+;(macroexpand '(loop [zero 0 [one two] [1 2]] #_expression 1))
+(let* [zero 0
+       G__446 [1 2]
+       vec__447 G__446
+       one (clojure.core/nth vec__447 0 nil)
+       two (clojure.core/nth vec__447 1 nil)]
+  (loop* [zero zero G__446 G__446]
+    (clojure.core/let [zero zero
+                       [one two] G__446] #_expression 1)))
+
+; Overview of the generated code:
+#_(let [loop-initial-bindings-here]
+       ( (fn generated-function-name [given-or-generated-symbols]
+           body))
+       given-or-generated-symbols)
+(defmacro dbgloop-throwaway
+  "Like standard loop, but this adds debugging on *every* iteration. Beware that it changes recur to be non-tail and stack-consuming. Beware that it breaks (recur...) in any inner (fn...) or #(...)."
+  {:special-form true, :forms '[(loop [bindings*] exprs*)]}
+  [bindings & body]
+  (assert-args
+    (vector? bindings) "a vector for its binding"
+    (even? (count bindings)) "an even number of forms in binding vector")
+  (let [db (destructure bindings)]
+    (if (= db bindings)
+      `(loop* ~bindings ~@body) ;why not use the below in all cases?
+      (let [vs (take-nth 2 (drop 1 bindings))
+            bs (take-nth 2 bindings)
+            gs (map (fn [b] (if (symbol? b) b (gensym))) bs) ;a list of "formal" parameters received by loop & our generated funtion
+            bfs (reduce (fn [ret [b v g]] ;in CLJ source this used reduce1
+                          (if (symbol? b)
+                            (conj ret g v) 
+                            (conj ret g v b g))) ; g is the formal generated/helper parameter name
+                  [] (map vector bs vs gs))]
+        `(let ~bfs
+            (loop* ~(vec (interleave gs gs))
+               (let ~(vec (interleave bs gs)) ;~ tilda can apply to a (seq of seq...)
+                 ~@body)))))))
+
+; Impl. beware: recur in letfn, which (re)defines recur, doen't work (fully) as expected. If you have
+; (letfn [ (f [] recur) (recur [] 1)] (f)) ; here (f) returns value of symbol recur, i.e. locally defined function recur
+; but
+; (letfn [ (f [] (recur)) (recur [] 1)] (f)) ;here (f) invokes itself via recur, i.e. ignoring locally defined function recur
+; -- another proof is that the following fails with an unexpected argument to recur <- (recur) refers to f:
+; (letfn [ (f [] (recur 1)) (recur [p] 1)] (f)) 
+; -- the same with recur defined in (let) within the function:
+; (fn f [] (let [recur identity] (recur 1))
+(defmacro dbgloop
+  "Like standard loop, but this adds debugging on *every* iteration. Beware that it changes recur to be non-tail and stack-consuming. Beware that it breaks (recur...) in any inner (fn...) or #(...)."
+  {:special-form true, :forms '[(loop [bindings*] exprs*)]}
+  [bindings & body]
+  (assert-args
+    (vector? bindings) "a vector for its binding"
+    (even? (count bindings)) "an even number of forms in binding vector")
+  (let [vs (take-nth 2 (drop 1 bindings))
+        bs (take-nth 2 bindings)
+        gs (map (fn [b] (if (symbol? b) b (gensym))) bs) ;formal parameter names - whether user-given or generated (for destructuring)
+        bfs (reduce (fn [ret [b v g]] ;in CLJ source this used reduce1
+                      (if (symbol? b)
+                        (conj ret g v) 
+                        (conj ret g v b g))) ; g is the formal generated/helper parameter name
+              [] (map vector bs vs gs))
+        fn-name (gensym "dbgloop")]
+    `(let ~bfs
+        (letfn
+             [(~fn-name ~(vec gs)
+                       (let ~(vec (interleave bs gs))
+                           ~@body))
+              (~'dbgrecur    ~(vec gs) ; without ~' you'll get an error: Can't let qualified name: <namespace>/dbgrecur
+                       (dbgf ~fn-name ~@gs))]
+    
+           (dbgf ~fn-name ~@gs)))
+    #_(let ~(conj bfs
+              'recur `(fn recur ~(vec gs))
+              (let ~(vec (interleave bs gs)))
+              ~@body)
+        (dbgf recur ~@gs))))
+        
+                   
+                  
+
+; TODO See https://clojuredocs.org/clojure.core/take#example-5bba8825e4b00ac801ed9eac > "sees no exception"
 
 ;(defmacro defn-orig [])
 
