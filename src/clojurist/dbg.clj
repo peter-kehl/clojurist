@@ -280,9 +280,140 @@
 #_(if false (#(missing-function)))
 (if false ((fn [par]) #_missing_par))
 
+; The above dbg macro on its own doesn't work with recur. That's because recur requires tail recursion.
+; Hence dbgr. It replaces tail recursion with non-tail. How? By:
+; - redefining 'loop, 'fn and 'defn as new macros that
+; --- create new functions with unique names
+; --- define 'recur as a locally-bound function, that calls the user-created function (i.e. non-tail recursion).
+; However, dbgr doesn't support letfn - too complicated (would you like to fork and implement that?). It can't support recur within #(), because hanling of #() can't ve overriden.
+; Copy (re-indented) of original Clojure 1.10 implementations
+; (https://github.com/clojure/clojure/blob/master/src/clj/clojure/core.clj):
+; TODO fork from CLJ; branch; remove other macros/functions, add own namespace - then merge their upstream changes
+; --- even if my code refers to clojure.core/*, keep the copy in GIT, so that merge conflicts indicate their incompatible changes
+; ^<--- Can Clojure have same module/package split in several files, even in several folders?
+; An alternative: base on simpler implementation near the top of the same clojure/core.clj, but add (destructure). 
+(defn ^{:private true}
+  maybe-destructured
+  [params body]
+  (if (every? symbol? params)
+    (cons params body)
+    (loop [params params
+           new-params (with-meta [] (meta params))
+           lets []]
+      (if params
+        (if (symbol? (first params))
+          (recur (next params) (conj new-params (first params)) lets)
+          (let [gparam (gensym "p__")]
+            (recur (next params) (conj new-params gparam)
+                   (-> lets (conj (first params)) (conj gparam)))))
+        `(~new-params
+          (let ~lets
+           ~@body))))))
+
+(defmacro fn-orig
+  "params => positional-params* , or positional-params* & next-param
+  positional-param => binding-form
+  next-param => binding-form
+  name => symbol
+  
+  Defines a function"
+  {:added "1.0", :special-form true,
+   :forms '[(fn name? [params* ] exprs*) (fn name? ([params* ] exprs*)+)]}
+  [& sigs]
+  (let [name (if (symbol? (first sigs)) (first sigs) nil)
+        sigs (if name (next sigs) sigs)
+        sigs (if (vector? (first sigs)) 
+               (list sigs) 
+               (if (seq? (first sigs))
+                 sigs
+                 ;; Assume single arity syntax
+                 (throw (IllegalArgumentException. 
+                          (if (seq sigs)
+                            (str "Parameter declaration " 
+                              (first sigs)
+                              " should be a vector")
+                            (str "Parameter declaration missing"))))))
+        psig (fn* [sig]
+               ;; Ensure correct type before destructuring sig
+               (when (not (seq? sig))
+                 (throw (IllegalArgumentException.
+                          (str "Invalid signature " sig
+                            " should be a list"))))
+               (let [[params & body] sig
+                     _ (when (not (vector? params))
+                         (throw (IllegalArgumentException. 
+                                  (if (seq? (first sigs))
+                                    (str "Parameter declaration " params
+                                      " should be a vector")
+                                    (str "Invalid signature " sig
+                                      " should be a list")))))
+                     conds (when (and (next body) (map? (first body))) 
+                                 (first body))
+                     body (if conds (next body) body)
+                     conds (or conds (meta params))
+                     pre (:pre conds)
+                     post (:post conds)                       
+                     body (if post
+                            `((let [~'% ~(if (< 1 (count body)) 
+                                             `(do ~@body) 
+                                           (first body))]
+                               ~@(map (fn* [c] `(assert ~c)) post)
+                               ~'%))
+                            body)
+                     body (if pre
+                            (concat (map (fn* [c] `(assert ~c)) pre) 
+                              body)
+                            body)]
+                 (maybe-destructured params body)))
+        new-sigs (map psig sigs)]
+    (with-meta
+      (if name
+        (list* 'fn* name new-sigs)
+        (cons 'fn* new-sigs))
+      (meta &form))))
+
+(defmacro ^{:private true} assert-args
+  [& pairs]
+  `(do (when-not ~(first pairs)
+         (throw (IllegalArgumentException.
+                  (str (first ~'&form) " requires " ~(second pairs) " in " ~'*ns* ":" (:line (meta ~'&form))))))
+     ~(let [more (nnext pairs)]
+        (when more
+           (list* `assert-args more)))))
+
+(defmacro loop-orig
+  "Evaluates the exprs in a lexical context in which the symbols in
+  the binding-forms are bound to their respective init-exprs or parts
+  therein. Acts as a recur target."
+  {:added "1.0", :special-form true, :forms '[(loop [bindings*] exprs*)]}
+  [bindings & body]
+  (assert-args
+    (vector? bindings) "a vector for its binding"
+    (even? (count bindings)) "an even number of forms in binding vector")
+  (let [db (destructure bindings)]
+    (if (= db bindings)
+      `(loop* ~bindings ~@body)
+      (let [vs (take-nth 2 (drop 1 bindings))
+            bs (take-nth 2 bindings)
+            gs (map (fn [b] (if (symbol? b) b (gensym))) bs)
+            bfs (reduce (fn [ret [b v g]] ;in CLJ source this used reduce1
+                          (if (symbol? b)
+                            (conj ret g v)
+                            (conj ret g v b g)))
+                  [] (map vector bs vs gs))]
+        `(let ~bfs
+            (loop* ~(vec (interleave gs gs))
+               (let ~(vec (interleave bs gs))
+                  ~@body)))))))
 
 
+;(defmacro defn-orig [])
 
+; TODO Can we import a namespace that defines fn, and use/require so it hides clojure.core/fn? 
+; If so, we can Define fn referring to clojure.core/fn.
+; AND/OR: defmacro dbgloop
+
+;TODO dbg, dbgf, dbgloop: (re)define let [dbg-prefix-scope XXX] and check it in &env to automate scopes 
 
 
 
