@@ -12,43 +12,35 @@
 (def leven
   (fn levensh [from to]
     (letfn
-      [(diff [cand] ;number of differences in naive comparison char by char (as if we allowed char replacements only)
-         (#_dbg #_"+" +
-           (apply + ;good that (+) returns 0
-             (map
-               #(if (= %1 %2) 1 0)
-               cand to))
-           (int (Math/abs (- (count to) (count cand))))))
-       
-       ;generate a seq of [candidate num-of-changes] with one-step changes ahead
+      [;generate a seq of [candidate num-of-changes] with one-step changes ahead
        (next-candidates [[prev-candidate prev-num-of-changes]]
-         (println "prev-num-of-changes" (type prev-num-of-changes) "and prev-candidate" prev-candidate)
+         #_(println "prev-num-of-changes" (type prev-num-of-changes) "and prev-candidate" prev-candidate)
          (assert (number? prev-num-of-changes) (str "Actual type" (type prev-num-of-changes) prev-num-of-changes))
-         (let [prefix (dbg :apply-str apply str (for [pair-of-chars (map vector prev-candidate to) ;prefix is a shared initial part of: prev and to
-                                                      :while (= (first pair-of-chars) (second pair-of-chars))]
-                                                  (dbg :first_pair-of-chars first pair-of-chars)))]
+         (let [prefix (#_dbg #_:apply-str apply str (for [pair-of-chars (map vector prev-candidate to) ;prefix is a shared initial part of: prev and to
+                                                          :while (= (first pair-of-chars) (second pair-of-chars))]
+                                                      (#_dbg #_:first_pair-of-chars first pair-of-chars)))]
            #_TODO-for-end-of-prefix-onwards_change-each-index
            #_TODO-merge-two-let
            ;(dbg-println "Prefix " prefix)
            (let [prev-count (count prev-candidate)
                  to-count (count to)
                  prefix-count (count prefix)]
-             (dbg "str -> into [] with prefix" into
+             (#_dbg #_"str -> into [] with prefix" into
                ; if a change reverts a previous change, we still count both changes. Such paths get eliminated by rating.
                (dbg "into ()" into () ;merge 1 or 2 out of the following 3 candidate possibilities
                  (if (<= prev-count to-count)
                    [[(str prefix
-                       (dbg "get inc prefix-count1" get to (inc prefix-count)) ;added 1 char
+                       (#_dbg #_"get inc prefix-count1" get to (inc prefix-count)) ;added 1 char
                        (apply str (drop      prefix-count  prev-candidate)))
                      (inc prev-num-of-changes)] ;keep the rest
                     [(str prefix
-                       (dbg "get inc prefix-count2" get to (inc prefix-count)) ;replaced 1 char
+                       (#_dbg #_"get inc prefix-count2" get to (inc prefix-count)) ;replaced 1 char
                        (apply str (drop (inc prefix-count) prev-candidate)))
                      (inc prev-num-of-changes)]] ;adjust the rest by 1 char
                    []))
                (if (>= prev-count to-count)
                  [[(str prefix
-                     (dbg "into prefix 3: apply str" apply str (drop (inc prefix-count) prev-candidate)))
+                     (#_dbg #_"into prefix 3: apply str" apply str (drop (inc prefix-count) prev-candidate)))
                    (inc prev-num-of-changes)]] ;removed
                  [])))))
        
@@ -56,39 +48,41 @@
        (compare-ignoring-effort [[cand1 _] [cand2 _]]
          (compare cand1 cand2))
        
+       (diff [cand] ;number of differences in naive comparison char by char (as if we allowed char replacements only), plus a difference in length
+          (apply +
+            (int (Math/abs (- (count to) (count cand))))
+            (map
+              #(if (= %1 %2) 1 0)
+              cand to)))
+          
        (rate [[candidate num-changes]]
          (#_dbg #_"+" + (diff candidate)
             num-changes))
        
-       (compare-full [one two]
-         (#_dbg #_"compare-full"
-          (fn [[cand1 num-ch1 :as pair1]
-               [cand2 num-ch2 :as pair2]]
-            (let [likeness-and-effort (comp (rate pair1) (rate pair2))]
-              (if (zero? likeness-and-effort)
-                (comp cand1 cand2) ;this ensures we keep all candidates, including ones with same ranking, because their future may vary
-                likeness-and-effort)))
-          one two))
+       (compare-full [[cand1 num-ch1 :as pair1] [cand2 num-ch2 :as pair2]]
+         (let [likeness-and-effort (compare (rate pair1) (rate pair2))]
+           (if (zero? likeness-and-effort)
+             (compare cand1 cand2) ;this ensures we keep all candidates, including ones with same ranking, because their future may vary
+             likeness-and-effort)))
        
        (next-generation [previous-generation] ; Parameter and result are of type: coll of [candidate num-of-changes]
-         (dbg :count count ;count forces the lazy
-           (for [pair (dbg :count :validate-queue validate-queue previous-generation)
-                 n (dbg :count :next-candidates next-candidates pair)
-                 c n]
-               c)))
+         (dbgf :next-generation identity ;to set the upper scope for dbgf of lazy seq.
+           (for [pair (dbgf :next-generation :next-gen->validate-queue validate-queue previous-generation)
+                 next-pair (dbgf :next-generation :next-gen->next-candidates next-candidates pair)]
+             next-pair)))
        (validate-queue [pairs]
-         (print "validate-queue")
-         (clojure.pprint/pprint pairs)
+         #_(print "validate-queue")
+         #_(clojure.pprint/pprint pairs)
          (count ;to consume the lazy sequence
-            (for [[cand num] pairs]
-              (do
-                (println "validating cand" cand "num" num)
-                (assert (string? cand))
-                (assert (number? num))
-                (println "validating cand - after assert"))))
-         (println "after for")
+           (for [[cand num] pairs]
+             (do
+               #_(println "validating cand" cand "num" num)
+               (assert (string? cand))
+               (assert (number? num))
+               #_(println "validating cand - after assert"))))
+         #_(println "after for")
          pairs)]
-       
+      
       ;if slow, transform somehow into a lazy seq.
       
       
@@ -106,17 +100,19 @@
                 backlog (sorted-set-by compare-full)
                 best-num-changes nil]
         ;best-num-changes is non-nil only once we have (any) results
-        (validate-queue priority)
-        (validate-queue backlog)
+        (dbgf validate-queue priority)
+        (dbgf validate-queue backlog)
         (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
           (second (first priority))
           (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.05)))
             (recur (into priority backlog) (empty backlog) best-num-changes) ;<<<
-            (let [priority-moved (#_dbg #_"into->priority-moved" into (#_dbg #_"empty priority" empty priority)
-                                   (dbg next-generation priority)) ;<<<
-                  _ (validate-queue priority-moved)
-                  priority-moved-results (filter (fn [cand _] (= cand to)) priority-moved)
-                  _ (validate-queue priority-moved-results)
+            (let [priority-moved (into (#_dbg #_"empty priority" empty priority)
+                                   (#_dbgf next-generation priority))
+                  _ (dbgf validate-queue priority-moved)
+                  priority-moved-results (filter
+                                           (fn [[cand _]] (= cand to))
+                                           priority-moved)
+                  _ (dbgf validate-queue priority-moved-results)
                   ;priority-moved-results-nums (map (fn [_ num-changes] num-changes))
                   priority-moved-best-num-changes (if (seq priority-moved-results)
                                                     (apply min (map (fn [_ num-changes] num-changes) priority-moved-results))
