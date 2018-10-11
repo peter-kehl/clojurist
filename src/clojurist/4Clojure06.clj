@@ -79,12 +79,13 @@
        (validate-queue [pairs]
          (print "validate-queue")
          (clojure.pprint/pprint pairs)
-         (for [[cand num] pairs]
-           (do
-             (println "validating cand" cand "num" num)
-             (assert (string? cand))
-             (assert (number? num))
-             (println "validating cand - after assert")))
+         (count ;to consume the lazy sequence
+            (for [[cand num] pairs]
+              (do
+                (println "validating cand" cand "num" num)
+                (assert (string? cand))
+                (assert (number? num))
+                (println "validating cand - after assert"))))
          (println "after for")
          pairs)]
        
@@ -101,7 +102,7 @@
       ; Once you find one result, remove all candidates that would take same number of steps or more.
       ; Repeat until all candidates reach (and obviously have same number of steps).
       
-      (dbgloop [priority (sorted-set-by compare-full [[from 0]])
+      (dbgloop [priority (sorted-set-by compare-full [from 0])
                 backlog (sorted-set-by compare-full)
                 best-num-changes nil]
         ;best-num-changes is non-nil only once we have (any) results
