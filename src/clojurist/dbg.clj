@@ -9,7 +9,6 @@
   (def ^:dynamic dbg-show-function-forms value))
 (dbg-show-function false)
 
-
 (def ^:dynamic dbg-indent-level 0)
 (defn dbg-indent-plus [] (def ^:dynamic dbg-indent-level (inc dbg-indent-level)))
 (defn dbg-indent-minus [] (def ^:dynamic dbg-indent-level (Math/max (dec dbg-indent-level) 0))) ;TODO warn on negative, but prevent further dbg-unindent reporting
@@ -24,8 +23,9 @@
        (str (dbg-indentation) indentedOtherLines)
        indentedOtherLines))))
 
-;alternatively: (binding [*out* ...] (callback...)) or (def *out* ....)
+; Like clojure.core/print, but indented
 (defn dbg-print [& args]
+  ;alternatively: (binding [*out* ...] (callback...)) or (def *out* ....)
   (print (dbg-indent
            (reduce
              #(if (= % "")
@@ -42,11 +42,43 @@
   ;Good that Clojure regex doesn't use Java Regex MULTILINE-like "m?" by default, because we want to exclude the last line only
   (clojure.string/replace (with-out-str (clojure.pprint/pprint obj)) #"\n$" ""))
 
-;TODO Print long or multi-line obj starting on a separate line
-;Print prefix, a space, and pretified obj.
+(defn dbg-screen-columns
+  ([] (dbg-screen-columns 150))
+  ([mx]
+   (println (loop [res "1"]
+              (if (>= (count res) mx)
+                res
+                (recur (str res \space (+ (count res) 2))))))))
+              
+(if (not (resolve 'dbg-screen-columns)) ;TODO remove once this is in a module
+    (def dbg-screen-width 80))
+
+; Print a given message, indented, a space, and pretty print a given object. The object goes on the same line, or on a separate line.
+; If the last line of message, once indented, the space and the pretified object, fit within dbg-screen-width, then
+; this prints them on the same line. Otherwise it prints the pretified object (indented) starting on a new line. 
 ; Unlike clojure.pprint/pprint, this does *not* append a newline.
 (defn dbg-pprint-last [prefix obj]
-  (dbg-print prefix (pretty obj)))
+  (dbg-print prefix)
+  (let [prefix-str (str prefix)
+        prettified (pretty obj)
+        obj-has-one-line (re-matches #"^.*$" prettified)
+        ; To be platform-independent,
+        ; using (.|\n) instead of (?s) which would make dot . also match newlines.
+        ; (?s) is Java-specific but not for CLJS or .NET (https://docs.oracle.com/javase/7/docs/api/java/util/regex/Pattern.html#DOTALL
+        [_ prefix-bulk _ _ prefix-last] (re-matches #"^(((.|\n)*\n)*)([^\n]+)$" prefix)
+        message-and-obj-fit-one-line
+            (and
+                 obj-has-one-line
+                 ;if a string, consisting of non-newline characters, exactly fills up a Linux KDE Terminal, and then you output a newline,
+                 ;that newline works as expected: it starts a new line, but as if itself didn't have any width. I.e. it doesn't
+                 ;generate two (visual) newlines. 
+                 (<= (+ (count (dbg-indentation)) (count prefix-last) 1 (count prettified))
+                     dbg-screen-width))]
+    (if message-and-obj-fit-one-line
+      (print \space prettified)
+      (do
+        (println)
+        (dbg-print \space prettified)))))
 
 ;---- For both dbg and dbgf.
 (defn dbg-call-before [msg & args]
@@ -65,7 +97,8 @@
 
 (defn dbg-call-throw [msg e]
   (dbg-indent-minus)
-  (dbg-println msg "Throw" msg "throwable:" e)
+  (dbg-println msg "Throw" msg "throwable:")
+  (dbg-println e)
   (throw e))
   
 ;This is a macro and not a function, so we can use `dbg` with other macros/special forms.
@@ -83,10 +116,10 @@
           'catch 'Throwable 'e
           (list 'dbg-call-throw msg 'e)))))
 
-; an alternative to dbg-call, but it only works with functions, not with macros/special forms
+; an alternative to dbg-call, but it only works with functions, not with macros/special forms. Used by dbg.
 (defn dbg-call-f [msg fun & args]
   ; Here and in dbg macro: Don't use colon : in printout, because it doesn't look good if msg is a keyword.
-  (dbg-call-before msg args)
+  (apply dbg-call-before msg args)
   (try
     (let [res (apply fun args)]
       (dbg-call-after msg res)
@@ -134,6 +167,7 @@
         firstIsNotFunction (or (string? msgOrFun) (keyword? msgOrFun))
         ; "logical" (with a variable position among parameters):
         msg (or msgAsGiven (str &form)) ;without (str) the macro would inject the user's code unqouted
+        ;TODO here and below: if (str &form), pprint as code & try on one line or two
         fun (if (not msgAsGiven)
               msgOrFun
               (if secondKeyword

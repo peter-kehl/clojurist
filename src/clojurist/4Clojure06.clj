@@ -1,5 +1,6 @@
 (require 'clojure.set)
 (require 'clojure.pprint)
+(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
 
 ;to reload this file in REPL, run:
 ;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/4Clojure05.clj")
@@ -104,8 +105,8 @@
                 backlog (sorted-set-by compare-full)
                 best-num-changes nil]
         ;best-num-changes is non-nil only once we have (any) results
-        (validate-queue priority
-          (validate-queue backlog))
+        (validate-queue priority)
+        (validate-queue backlog)
         (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
           (second (first priority))
           (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.05)))
