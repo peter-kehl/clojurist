@@ -14,7 +14,7 @@
     (if (= from to) ;the below doesn't handle it. Too much work to refactor now.
        0
        (let [num-of-generations (atom 0)
-             item-type #_nil java.lang.Long #_java.lang.Character] ;if item-type is nil, then don't validate items
+             item-type nil #_clojure.lang.Keyword #_java.lang.Long #_java.lang.Character] ;if item-type is nil, then don't validate items
          (letfn
            [;generate a seq of [candidate num-of-changes] with one-step changes ahead
             (next-candidates [[prev-candidate prev-num-of-changes]]
@@ -23,9 +23,9 @@
                       (for [i prev-candidate]
                           (assert (instance? item-type i)))))
               (assert (number? prev-num-of-changes) (str "Actual type" (type prev-num-of-changes) prev-num-of-changes))
-              (let [prefix (#_dbg #_:apply-str apply str (for [pair-of-chars (map vector prev-candidate to) ;prefix is a shared initial part of: prev and to
-                                                               :while (= (first pair-of-chars) (second pair-of-chars))]
-                                                           (#_dbg #_:first_pair-of-chars first pair-of-chars)))]
+              (let [prefix (vec (for [pair-of-items (map vector prev-candidate to) ;prefix is a shared initial part of: prev and to
+                                      :while (= (first pair-of-items) (second pair-of-items))]
+                                   (#_dbg #_:first_pair-of-chars first pair-of-items)))]
                 #_TODO-for-end-of-prefix-onwards_change-each-index
                 #_TODO-merge-two-let
                 (dbg-println "Prefix " prefix)
@@ -36,18 +36,18 @@
                     ; if a change reverts a previous change, we still count both changes. Such paths get eliminated by rating.
                     (into () ;merge 1 or 2 out of the following 3 candidate possibilities
                       (if (<= prev-count to-count)
-                        [[(str prefix
+                        [[(apply conj prefix
                             (#_dbg #_"get inc prefix-count1" get to prefix-count) ;add 1 char
-                            (apply str (drop      prefix-count  prev-candidate)))
+                            (drop      prefix-count  prev-candidate))
                           (inc prev-num-of-changes)] ;keep the rest
-                         [(str prefix
+                         [(apply conj prefix
                             (#_dbg #_"get inc prefix-count2" get to prefix-count) ;replace 1 char
-                            (apply str (drop (inc prefix-count) prev-candidate)))
+                            (drop (inc prefix-count) prev-candidate))
                           (inc prev-num-of-changes)]] ;adjust the rest by 1 char
                         []))
                     (if (>= prev-count to-count)
-                      [[(str prefix
-                          (#_dbg #_"into prefix 3: apply str" apply str (drop (inc prefix-count) prev-candidate)))
+                      [[(apply conj prefix
+                          (drop (inc prefix-count) prev-candidate))
                         (inc prev-num-of-changes)]] ;remove 1 char
                       [])))))
             
@@ -81,7 +81,7 @@
             ; 2. scope for lazy seq ->vvv
             (next-generation [previous-generation] ; Parameter and result are of type: coll of [candidate num-of-changes]
               (dbgf :next-generation identity ;to set the upper scope for dbgf of lazy seq.
-                (for [pair (#_dbgf #_:next-generation #_:next-gen->validate-queue validate-queue previous-generation)
+                (for [pair (dbgf :next-generation :next-gen->validate-queue validate-queue previous-generation)
                       next-pair (dbgf :next-generation :next-gen->next-candidates next-candidates pair)]
                   next-pair)))
             ;----if slow, transform somehow into a lazy seq.
@@ -113,14 +113,14 @@
              ;best-num-changes is non-nil only once we have (any) results
              (assert (set? priority))
              (assert (set? backlog))
-             (dbgf "validate priority" validate-queue priority)
-             (dbgf "validate priority" validate-queue backlog)
+             (#_dbgf #_"validate priority" validate-queue priority)
+             (#_dbgf #_"validate priority" validate-queue backlog)
              (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
                (second (first priority)) ;this was supposed to be the (one) best result, but (at least for "kitten" -> "sitting" it wasn't reached!
                (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.05))) ;priority below a threshold, and backlog is non-empty => merge
                  (dbgrecur (into priority backlog) (empty backlog) best-num-changes) ;<<<
                  (let [priority-moved (into (#_dbg #_"empty priority" empty priority)
-                                        (#_dbgf #_:next-generation next-generation priority))
+                                        (dbgf :next-generation next-generation priority))
                        _ (validate-queue priority-moved)
                        priority-moved-results (filter
                                                 (fn [[cand _]] (= cand to))
