@@ -49,9 +49,8 @@
               (if (>= (count res) mx)
                 res
                 (recur (str res \space (+ (count res) 2))))))))
-              
-(if (not (resolve 'dbg-screen-columns)) ;TODO remove once this is in a module
-    (def dbg-screen-width 80))
+
+(def dbg-screen-width "Max. line width for dbg-pprint-last (when possible). If 0, no such limit." 80)
 
 ; Print a given message, indented, a space, and pretty print a given object. The object goes on the same line, or on a separate line.
 ; If the last line of message, once indented, the space and the pretified object, fit within dbg-screen-width, then
@@ -67,13 +66,15 @@
         ; (?s) is Java-specific but not for CLJS or .NET (https://docs.oracle.com/javase/7/docs/api/java/util/regex/Pattern.html#DOTALL
         [_ prefix-bulk _ _ prefix-last] (re-matches #"^(((.|\n)*\n)*)([^\n]+)$" prefix)
         message-and-obj-fit-one-line
-            (and
-                 obj-has-one-line
-                 ;if a string, consisting of non-newline characters, exactly fills up a Linux KDE Terminal, and then you output a newline,
-                 ;that newline works as expected: it starts a new line, but as if itself didn't have any width. I.e. it doesn't
-                 ;generate two (visual) newlines. 
-                 (<= (+ (count (dbg-indentation)) (count prefix-last) 1 (count prettified))
-                     dbg-screen-width))]
+          (and
+               obj-has-one-line
+               (or
+                  (zero? dbg-screen-width)
+                  ;if a string, consisting of non-newline characters, exactly fills up a Linux KDE Terminal, and then you output a newline,
+                  ;that newline works as expected: it starts a new line, but as if itself didn't have any width. I.e. it doesn't
+                  ;generate two (visual) newlines. 
+                  (<= (+ (count (dbg-indentation)) (count prefix-last) 1 (count prettified))
+                      dbg-screen-width)))]
     (if message-and-obj-fit-one-line
       (print \space prettified)
       (do
@@ -195,6 +196,11 @@
                                         (if secondKeyword
                                           (if (not= secondKeyword :_) secondKeyword)
                                           (if (not= firstKeyword  :_) firstKeyword)))]
+    ;TODO 1. insteaf of keyword, use string. 2. treat string literal to be symbol-friendly
+    ;3. prevent various literals (with special characters) that would lead to the same symbol
+    ;4. prevent same literals (and hance same symbols) to override an upper scope.
+    ;--- search in &env for a symbol with name equal to value dbg-scope-symbol and for any symbol starting with value of dbg-snapshot-prefix
+    ;--- generate `[let ~dbg-scope-symbol (dbg-info :label ~user-string]
     (let [declare-binding (list 'binding ['dbg-indent-level
                                           (list 'inc (symbol (str dbg-snapshot-prefix scopeBackReferenceKeyword)))])
           declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeForwardDefinitionKeyword)) 'dbg-indent-level])
@@ -271,14 +277,6 @@
             (concat declare-let execute)
             (concat '(do) execute)))))))
 
-; Create a scope that you can refer to from dbg or dbgf. This works with either a function, a macro or a special form.
-(defmacro dbg-scope [scope-keyword invoke & args]
-  (assert (keyword? scope-keyword) "scope-keyword must be a keyword")
-  (list
-    'let [(symbol (str dbg-snapshot-prefix scope-keyword)) 'dbg-indent-level]
-    (cons invoke args)))
-          
-  
 ; TODO dbg>> for cross-thread keyword references
 ; TODO dbg-cfg macro
 
