@@ -29,6 +29,7 @@
             
             ;generate a seq of [candidate num-of-changes] with one-step changes ahead
             (next-candidates [[prev-candidate prev-num-of-changes]]
+              (assert (not= prev-candidate to) "Reached already - should have been handled already")
               (validate-items prev-candidate "next-candidates->start")
               (assert (number? prev-num-of-changes) (str "Actual type" (type prev-num-of-changes) prev-num-of-changes))
               (let [prefix (vec (for [pair-of-items (map vector prev-candidate to) ;prefix is a shared initial part of: prev and to
@@ -36,13 +37,13 @@
                                    (#_dbg #_:first_pair-of-chars first pair-of-items)))]
                 #_TODO-for-end-of-prefix-onwards_change-each-index
                 #_TODO-merge-two-let
-                (dbg-println "Prefix " prefix)
+                (dbg-println "Prev. candidate" prev-candidate "-> prefix" prefix)
                 (let [prev-count (count prev-candidate)
                       to-count (count to)
                       prefix-count (count prefix)]
                   (#_dbg #_"str -> into [] with prefix" into
                     ; if a change reverts a previous change, we still count both changes. Such paths get eliminated by rating.
-                    (into () ;merge 1 or 2 out of the following 3 candidate possibilities
+                    (into () ;merge any possible & worthwhile candidates out of the following 3:
                       (if (<= prev-count to-count)
                         [[(validate-items (apply conj prefix
                                             (#_dbg #_"get inc prefix-count1" get to prefix-count) ;add 1 char
