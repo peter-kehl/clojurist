@@ -24,7 +24,9 @@
                        (if (not (instance? item-type i))
                           (println "Candidate" msg candidate "has item" i "which is" (type i)))
                        (assert (instance? item-type i)
-                         (str "Item " msg " expected to be " item-type " but it is " (type i) ": " i)))))))
+                         (str "Item " msg " expected to be " item-type " but it is " (type i) ": " i))))))
+              candidate)
+            
             ;generate a seq of [candidate num-of-changes] with one-step changes ahead
             (next-candidates [[prev-candidate prev-num-of-changes]]
               (validate-items prev-candidate "next-candidates->start")
@@ -42,18 +44,21 @@
                     ; if a change reverts a previous change, we still count both changes. Such paths get eliminated by rating.
                     (into () ;merge 1 or 2 out of the following 3 candidate possibilities
                       (if (<= prev-count to-count)
-                        [[(apply conj prefix
-                            (#_dbg #_"get inc prefix-count1" get to prefix-count) ;add 1 char
-                            (drop      prefix-count  prev-candidate)) ;keep the rest
+                        [[(validate-items (apply conj prefix
+                                            (#_dbg #_"get inc prefix-count1" get to prefix-count) ;add 1 char
+                                            (drop      prefix-count  prev-candidate))
+                            "add 1 char") ;keep the rest
                           (inc prev-num-of-changes)]
-                         [(apply conj prefix
-                            (#_dbg #_"get inc prefix-count2" get to prefix-count) ;replace 1 char
-                            (drop (inc prefix-count) prev-candidate))
+                         [(validate-items (apply conj prefix
+                                            (#_dbg #_"get inc prefix-count2" get to prefix-count) ;replace 1 char
+                                            (drop (inc prefix-count) prev-candidate))
+                            "replace 1 char")
                           (inc prev-num-of-changes)]] ;adjust the rest by 1 char
                         []))
                     (if (>= prev-count to-count)
-                      [[(apply conj prefix
-                          (drop (inc prefix-count) prev-candidate))
+                      [[(validate-items (apply conj prefix
+                                          (drop (inc prefix-count) prev-candidate))
+                          "remove 1 char")
                         (inc prev-num-of-changes)]] ;remove 1 char
                       [])))))
             
