@@ -13,19 +13,27 @@
   (fn levensh [from to]
     (if (= from to) ;the below doesn't handle it. Too much work to refactor now.
        0
-       (let [num-of-generations (atom 0)
+       (let [from (seq from) ;from string to a sequence
+             to (seq to)
+             num-of-generations (atom 0)
              item-type #_nil #_clojure.lang.Keyword #_java.lang.Long java.lang.Character] ;if item-type is nil, then don't validate items
          (letfn
-           [(validate-items [candidate msg]
-              (if item-type
+           [(validate-items
+              ([candidate msg]
+               (validate-items candidate msg true))
+              ([candidate msg do-fail] ;do-fail is to allow/supress assert, because a failed assert discards recent output
+               (if item-type
                  (count
                    (for [i candidate]
                      (do
                        (if (not (instance? item-type i))
-                          (println "Candidate" msg candidate "has item" i "which is" (type i)))
-                       (assert (instance? item-type i)
-                         (str "Item " msg " expected to be " item-type " but it is " (type i) ": " i))))))
-              candidate)
+                         (do
+                           (println "Candidate" msg candidate "has item" i "which is" (type i))
+                           (flush)))
+                       (if do-fail
+                          (assert (instance? item-type i)
+                                  (str "Item " msg " expected to be " item-type " but it is " (type i) ": " i))))))
+                candidate)))
             
             ;generate a seq of [candidate num-of-changes] with one-step changes ahead
             (next-candidates [[prev-candidate prev-num-of-changes]]
@@ -38,6 +46,7 @@
                 #_TODO-for-end-of-prefix-onwards_change-each-index
                 #_TODO-merge-two-let
                 (dbg-println "Prev. candidate" prev-candidate "-> prefix" prefix)
+                (println "Prev. candidate" prev-candidate "-> prefix" prefix)
                 (let [prev-count (count prev-candidate)
                       to-count (count to)
                       prefix-count (count prefix)]
@@ -117,7 +126,7 @@
            ; Once you find one result, remove all candidates that would take same number of steps or more.
            ; Repeat until all candidates reach (and obviously have same number of steps).
            
-           (dbgloop [priority (dbgf sorted-set-by compare-full [from 0])
+           (dbgloop [priority (sorted-set-by compare-full [from 0])
                      backlog (sorted-set-by compare-full)
                      best-num-changes nil
                      ;past-candidate-pairs (sorted-set-by compare-full) ;;set of [candidate num-changes] that were/are being already handled (i.e. in priority, backlog or thrown away)
@@ -157,29 +166,29 @@
                        _ (validate-queue priority-moved-past-better)
                        
                        priority-moved-excluding-worse
-                         (filter
-                           (fn [[cand num]]
-                             (validate-items cand "excl.worse")
-                             (not (contains? priority-moved-past-same-or-worse-map cand)))
-                           priority-moved-unfiltered)
+                       (filter
+                         (fn [[cand num]]
+                           (validate-items cand "excl.worse")
+                           (not (contains? priority-moved-past-same-or-worse-map cand)))
+                         priority-moved-unfiltered)
                        _ (validate-queue priority-moved-excluding-worse)
                        
                        priority-moved
-                         (apply conj
-                           ;(re)inject any options that now look better. Being sets, conj keeps the items from the 1st set.
-                           ;Hence the "better" set is the first param.
-                           priority-moved-past-better
-                           priority-moved-excluding-worse)
+                       (apply conj
+                         ;(re)inject any options that now look better. Being sets, conj keeps the items from the 1st set.
+                         ;Hence the "better" set is the first param.
+                         priority-moved-past-better
+                         priority-moved-excluding-worse)
                        
                        past-candidate-to-num-next
-                         (apply assoc
-                           past-candidate-to-num
-                           (for [ [cand num] priority-moved
-                                 key-or-value [cand num]]
-                             (do
-                               (validate-items cand "past-t-num")
-                               (assert (number? num))
-                               key-or-value)))
+                       (apply assoc
+                         past-candidate-to-num
+                         (for [ [cand num] priority-moved
+                               key-or-value [cand num]]
+                           (do
+                             (validate-items cand "past-t-num")
+                             (assert (number? num))
+                             key-or-value)))
                        
                        _ (validate-queue priority-moved)
                        priority-moved-results (filter
@@ -191,15 +200,15 @@
                        _ (validate-queue priority-moved-results)
                        
                        priority-moved-best-num-changes
-                         (if (seq priority-moved-results)
-                           (apply min
-                             (map
-                               (fn [[_cand num-changes]]
-                                 (validate-items _cand "->best num ch.")
-                                 (assert (number? num-changes))
-                                 num-changes)
-                               priority-moved-results))
-                           nil)
+                       (if (seq priority-moved-results)
+                         (apply min
+                           (map
+                             (fn [[_cand num-changes]]
+                               (validate-items _cand "->best num ch.")
+                               (assert (number? num-changes))
+                               num-changes)
+                             priority-moved-results))
+                         nil)
                        best-num (if best-num-changes
                                   (if priority-moved-best-num-changes
                                     (min best-num-changes priority-moved-best-num-changes)
