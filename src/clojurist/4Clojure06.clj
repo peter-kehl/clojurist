@@ -109,7 +109,9 @@
            
            (dbgloop [priority (dbgf sorted-set-by compare-full [from 0])
                      backlog (sorted-set-by compare-full)
-                     best-num-changes nil]
+                     best-num-changes nil
+                     ;past-candidate-pairs (sorted-set-by compare-full) ;;set of [candidate num-changes] that were/are being already handled (i.e. in priority, backlog or thrown away)
+                     past-candidate-to-num {from 0}] 
              ;best-num-changes is non-nil only once we have (any) results
              (assert (set? priority))
              (assert (set? backlog))
@@ -118,11 +120,49 @@
              (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
                (second (first priority)) ;this was supposed to be the (one) best result, but (at least for "kitten" -> "sitting" it wasn't reached!
                (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.50#_(tried 0.05, 0.30, 0.5)))) ;priority below a threshold, and backlog is non-empty => merge
-                 (dbgrecur (into priority backlog) (empty backlog) best-num-changes) ;<<<
-                 (let [priority-moved (into (#_dbg #_"empty priority" empty priority)
-                                        (dbgf :next-generation next-generation priority))
+                 (dbgrecur (into priority backlog) (empty backlog) best-num-changes past-candidate-to-num) ;<<<
+                 (let [priority-moved-unfiltered (into (#_dbg #_"empty priority" empty priority)
+                                                   (dbgf :next-generation next-generation priority))
+                       _ (validate-queue priority-moved-unfiltered)
                        
-                       ;
+                       ;Collect two structures: a map and a set, both based on priority-moved-unfiltered and past-candidate-to-num.
+                       ;map candidate => num-changes, based on a subset of priority-moved-unfiltered.
+                       ;They were handled in the past, now found with the same or higher num-changes.
+                       [priority-moved-past-same-or-worse-map
+                        ;a subset of priority-moved-unfiltered. [cand num] that were handled in the past, now with more num-changes.
+                        priority-moved-past-better]
+                       (reduce
+                         (fn [[worse better] [cand num :as new-pair]]
+                           (let [past-num (past-candidate-to-num cand)]
+                             (if past-num
+                               (if (<= past-num num)
+                                 [(assoc worse cand num)
+                                  better]
+                                 [worse
+                                  (conj better new-pair)])
+                               [worse better])))
+                         [{} (empty priority)]
+                         priority-moved-unfiltered)
+                       
+                       priority-moved-excluding-worse
+                          (filter
+                            (fn [[cand num]] (not (contains? priority-moved-past-same-or-worse-map cand)))
+                            priority-moved-unfiltered)
+                       
+                       priority-moved
+                         (apply conj
+                           ;(re)inject any options that now look better. Being sets, conj keeps the items from the 1st set.
+                           ;Hence the "better" set is the first param.
+                           priority-moved-past-better
+                           priority-moved-excluding-worse)
+                       
+                       past-candidate-to-num-next
+                       (apply assoc
+                         past-candidate-to-num
+                         (for [ [cand num] priority-moved
+                               key-or-value [cand num]]
+                           key-or-value))
+                       
                        _ (validate-queue priority-moved)
                        priority-moved-results (filter
                                                 (fn [[cand _]] (= cand to))
@@ -167,7 +207,7 @@
                        (if (< @num-of-generations 350 #_250 #__400-too-much) ;limit number of generations - worthwhile for debugging
                          (do
                            (swap! num-of-generations inc)
-                           (dbgrecur priority-next backlog-next best-num))
+                           (dbgrecur priority-next backlog-next best-num past-candidate-to-num-next))
                          :over-limit))))))))))))
 (if false
   (leven "kitten" "sitting"))
