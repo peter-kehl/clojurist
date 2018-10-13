@@ -14,7 +14,7 @@
     (if (= from to) ;the below doesn't handle it. Too much work to refactor now.
        0
        (let [num-of-generations (atom 0)
-             item-type nil #_clojure.lang.Keyword #_java.lang.Long #_java.lang.Character] ;if item-type is nil, then don't validate items
+             item-type #_nil #_clojure.lang.Keyword #_java.lang.Long java.lang.Character] ;if item-type is nil, then don't validate items
          (letfn
            [;generate a seq of [candidate num-of-changes] with one-step changes ahead
             (next-candidates [[prev-candidate prev-num-of-changes]]
@@ -38,8 +38,8 @@
                       (if (<= prev-count to-count)
                         [[(apply conj prefix
                             (#_dbg #_"get inc prefix-count1" get to prefix-count) ;add 1 char
-                            (drop      prefix-count  prev-candidate))
-                          (inc prev-num-of-changes)] ;keep the rest
+                            (drop      prefix-count  prev-candidate)) ;keep the rest
+                          (inc prev-num-of-changes)]
                          [(apply conj prefix
                             (#_dbg #_"get inc prefix-count2" get to prefix-count) ;replace 1 char
                             (drop (inc prefix-count) prev-candidate))
@@ -117,10 +117,12 @@
              (#_dbgf #_"validate priority" validate-queue backlog)
              (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
                (second (first priority)) ;this was supposed to be the (one) best result, but (at least for "kitten" -> "sitting" it wasn't reached!
-               (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.05))) ;priority below a threshold, and backlog is non-empty => merge
+               (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.50#_(tried 0.05, 0.30, 0.5)))) ;priority below a threshold, and backlog is non-empty => merge
                  (dbgrecur (into priority backlog) (empty backlog) best-num-changes) ;<<<
                  (let [priority-moved (into (#_dbg #_"empty priority" empty priority)
                                         (dbgf :next-generation next-generation priority))
+                       
+                       ;
                        _ (validate-queue priority-moved)
                        priority-moved-results (filter
                                                 (fn [[cand _]] (= cand to))
@@ -155,14 +157,14 @@
                        backlog-keep (candidates-to-keep backlog)
                        _ (validate-queue backlog-keep)]
                    #_TODO-merge-previous-and-following-let
-                   (let [priority-next-count (int (* (count priority-keep) 0.10))
+                   (let [priority-next-count (Math/ceil #_int (* (count priority-keep) 0.30 #_(tried 0.02, 0.03, 0.10, 0.30 with num-of-gen. limit 100)))
                          priority-next (into (empty priority) (take priority-next-count priority-keep))
                          _ (validate-queue priority-next)
                          backlog-next  (into backlog-keep (drop priority-next-count priority-keep))
                          _ (validate-queue backlog-next)]
                      (if (and (empty? priority-keep) (empty? backlog-keep))
                        (str "Emptied " best-num)
-                       (if (< @num-of-generations 100) ;limit number of generations - worthwhile for debugging
+                       (if (< @num-of-generations 350 #_250 #__400-too-much) ;limit number of generations - worthwhile for debugging
                          (do
                            (swap! num-of-generations inc)
                            (dbgrecur priority-next backlog-next best-num))
