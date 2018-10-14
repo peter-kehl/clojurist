@@ -10,11 +10,11 @@
 ;-wide: generation of 1-step change alternatives
 ;-deep: iterating over the most promising alternatives first, based on a set ordered by number of differences 
 (def leven
-  (fn levensh [from to]
-    (if (= from to) ;the below doesn't handle it. Too much work to refactor now.
+  (fn levensh [from target]
+    (if (= from target) ;the below doesn't handle it. Too much work to refactor now.
        0
-       (let [from (seq from) ;from string to a sequence
-             to (seq to)
+       (let [from (vec from) ;from string to a seq.
+             target (vec target)
              num-of-generations (atom 0)
              item-type #_nil #_clojure.lang.Keyword #_java.lang.Long java.lang.Character] ;if item-type is nil, then don't validate items
          (letfn
@@ -32,15 +32,15 @@
                            (flush)))
                        (if do-fail
                           (assert (instance? item-type i)
-                                  (str "Item " msg " expected to be " item-type " but it is " (type i) ": " i))))))
-                candidate)))
+                                  (str "Candidate " candidate " when " msg " expected it to be " item-type " but it is " (type i) ": " i)))))))
+               candidate))
             
             ;generate a seq of [candidate num-of-changes] with one-step changes ahead
             (next-candidates [[prev-candidate prev-num-of-changes]]
-              (assert (not= prev-candidate to) "Reached already - should have been handled already")
+              (assert (not= prev-candidate target) "Reached already - should have been handled already")
               (validate-items prev-candidate "next-candidates->start")
               (assert (number? prev-num-of-changes) (str "Actual type" (type prev-num-of-changes) prev-num-of-changes))
-              (let [prefix (vec (for [pair-of-items (map vector prev-candidate to) ;prefix is a shared initial part of: prev and to
+              (let [prefix (vec (for [pair-of-items (map vector prev-candidate target) ;prefix is a shared initial part of: prev-candidate and target
                                       :while (= (first pair-of-items) (second pair-of-items))]
                                    (#_dbg #_:first_pair-of-chars first pair-of-items)))]
                 #_TODO-for-end-of-prefix-onwards_change-each-index
@@ -48,28 +48,36 @@
                 (dbg-println "Prev. candidate" prev-candidate "-> prefix" prefix)
                 (println "Prev. candidate" prev-candidate "-> prefix" prefix)
                 (let [prev-count (count prev-candidate)
-                      to-count (count to)
-                      prefix-count (count prefix)]
+                      target-count (count target)
+                      prefix-count (count prefix)
+                      next-num-of-changes (inc prev-num-of-changes)]
+                  (validate-items prefix "prefix")
+                  ; Here it used to add a character only if prev-candidate was of same length or shorter than target, and
+                  ; remove a character only if prev-candidate was of same length or longer than target. However,
+                  ; while that "heuristics" would accelerate most situations, it would prevent the best solutions
+                  ; in "lookeahead" situations that require removal of character(s) even if the candidate is shorter, or
+                  ; addition of character(s) if the candidate is longer, if more than a half of the rest of the candidate
+                  ; matches target (and hence it overcompensates what first looks like a loss).
                   (#_dbg #_"str -> into [] with prefix" into
-                    ; if a change reverts a previous change, we still count both changes. Such paths get eliminated by rating.
-                    (into () ;merge any possible & worthwhile candidates out of the following 3:
-                      (if (<= prev-count to-count)
+                    ; if a change reverts a previous change, we still count both changes. Such paths get eliminated by rating and by past-candidate-to-num.
+                    (into () ;merge any possible & worthwhile candidates (1, 2 or 3) out of the following 3:
+                      (if (< prefix-count target-count) ;otherwise we only need to remove the extra(s)
                         [[(validate-items (apply conj prefix
-                                            (#_dbg #_"get inc prefix-count1" get to prefix-count) ;add 1 char
+                                            (#_dbg #_"nth inc prefix-count1" nth target prefix-count) ;add 1 char; TODO revert from (nth) to (get) to trigger an error with string, where (println...) disappeared
                                             (drop      prefix-count  prev-candidate))
-                            "add 1 char") ;keep the rest
-                          (inc prev-num-of-changes)]
+                            (str "add 1 char to " prefix " at target pos. " prefix-count " from target " target)) ;keep the rest
+                          next-num-of-changes]
                          [(validate-items (apply conj prefix
-                                            (#_dbg #_"get inc prefix-count2" get to prefix-count) ;replace 1 char
+                                            (#_dbg #_"nth inc prefix-count2" nth target prefix-count) ;replace 1 char
                                             (drop (inc prefix-count) prev-candidate))
                             "replace 1 char")
-                          (inc prev-num-of-changes)]] ;adjust the rest by 1 char
+                          next-num-of-changes]] ;adjust the rest by 1 char
                         []))
-                    (if (>= prev-count to-count)
+                    (if (< prefix-count prev-count)
                       [[(validate-items (apply conj prefix
                                           (drop (inc prefix-count) prev-candidate))
                           "remove 1 char")
-                        (inc prev-num-of-changes)]] ;remove 1 char
+                        next-num-of-changes]] ;remove 1 char
                       [])))))
             
             ;toolkit on pairs/colls of [candidate num-of-changes]
@@ -78,10 +86,10 @@
             
             (diff [cand] ;number of differences in naive comparison char by char (as if we allowed char replacements only), plus a difference in length
               (apply +
-                (int (Math/abs (- (count to) (count cand))))
+                (int (Math/abs (- (count target) (count cand))))
                 (map
                   #(if (= %1 %2) 1 0)
-                  cand to)))
+                  cand target)))
             
             (rate [[candidate num-changes]]
               (+ (diff candidate)
@@ -195,7 +203,7 @@
                                                 (fn [[cand _num]]
                                                   (validate-items cand "->prior.moved res.")
                                                   (assert (number? _num))
-                                                  (= cand to))
+                                                  (= cand target))
                                                 priority-moved)
                        _ (validate-queue priority-moved-results)
                        

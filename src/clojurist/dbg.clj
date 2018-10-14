@@ -30,7 +30,8 @@
            (reduce
              #(if (= % "")
                 %2
-                (str % \space %2))
+                (str % \space
+                  (if (nil? %2) "nil" %2)))
              "" args)
            true)))
 (defn dbg-println [& args]
