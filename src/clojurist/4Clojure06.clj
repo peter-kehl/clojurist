@@ -4,7 +4,7 @@
 
 ;to reload this file in REPL, run:
 ;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/4Clojure05.clj")
-
+               
 ;http://www.4clojure.com/problem/101 Levenshtein Distance
 ;alternating wide and deep:
 ;-wide: generation of 1-step change alternatives
@@ -16,9 +16,19 @@
        (let [from (vec from) ;from string to a seq.
              target (vec target)
              num-of-generations (atom 0)
-             item-type #_nil #_clojure.lang.Keyword #_java.lang.Long java.lang.Character] ;if item-type is nil, then don't validate items
+             item-type #_nil #_clojure.lang.Keyword #_java.lang.Long java.lang.Character ;if item-type is nil, then don't validate items
+             conj (if
+                     (or
+                         (> (:major *clojure-version*) 1)
+                         (> (:minor *clojure-version*) 4))
+                     clojure.core/conj
+                     (fn conj-compat
+                       ([coll] coll)
+                       ([coll & entries]
+                        (apply clojure.core/conj coll entries))))]
          (letfn
-           [(validate-items
+           [
+            (validate-items
               ([candidate msg]
                (validate-items candidate msg true))
               ([candidate msg do-fail] ;do-fail is to allow/supress assert, because a failed assert discards recent output
@@ -62,19 +72,19 @@
                     ; if a change reverts a previous change, we still count both changes. Such paths get eliminated by rating and by past-candidate-to-num.
                     (into () ;merge any possible & worthwhile candidates (1, 2 or 3) out of the following 3:
                       (if (< prefix-count target-count) ;otherwise we only need to remove the extra(s)
-                        [[(validate-items (apply conj-compat prefix
+                        [[(validate-items (apply conj prefix
                                             (#_dbg #_"nth inc prefix-count1" nth target prefix-count) ;add 1 char; TODO revert from (nth) to (get) to trigger an error with string, where (println...) disappeared
                                             (drop      prefix-count  prev-candidate))
                             (str "add 1 char to " prefix " at target pos. " prefix-count " from target " target)) ;keep the rest
                           next-num-of-changes]
-                         [(validate-items (apply conj-compat prefix
+                         [(validate-items (apply conj prefix
                                             (#_dbg #_"nth inc prefix-count2" nth target prefix-count) ;replace 1 char
                                             (drop (inc prefix-count) prev-candidate))
                             "replace 1 char")
                           next-num-of-changes]] ;adjust the rest by 1 char
                         []))
                     (if (< prefix-count prev-count)
-                      [[(validate-items (apply conj-compat prefix
+                      [[(validate-items (apply conj prefix
                                           (drop (inc prefix-count) prev-candidate))
                           "remove 1 char")
                         next-num-of-changes]] ;remove 1 char
@@ -182,7 +192,7 @@
                        _ (validate-queue priority-moved-excluding-worse)
                        
                        priority-moved
-                       (apply conj-compat
+                       (apply conj
                          ;(re)inject any options that now look better. Being sets, conj keeps the items from the 1st set.
                          ;Hence the "better" set is the first param.
                          priority-moved-past-better
