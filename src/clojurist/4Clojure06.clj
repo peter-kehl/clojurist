@@ -62,19 +62,19 @@
                     ; if a change reverts a previous change, we still count both changes. Such paths get eliminated by rating and by past-candidate-to-num.
                     (into () ;merge any possible & worthwhile candidates (1, 2 or 3) out of the following 3:
                       (if (< prefix-count target-count) ;otherwise we only need to remove the extra(s)
-                        [[(validate-items (apply conj prefix
+                        [[(validate-items (apply conj-compat prefix
                                             (#_dbg #_"nth inc prefix-count1" nth target prefix-count) ;add 1 char; TODO revert from (nth) to (get) to trigger an error with string, where (println...) disappeared
                                             (drop      prefix-count  prev-candidate))
                             (str "add 1 char to " prefix " at target pos. " prefix-count " from target " target)) ;keep the rest
                           next-num-of-changes]
-                         [(validate-items (apply conj prefix
+                         [(validate-items (apply conj-compat prefix
                                             (#_dbg #_"nth inc prefix-count2" nth target prefix-count) ;replace 1 char
                                             (drop (inc prefix-count) prev-candidate))
                             "replace 1 char")
                           next-num-of-changes]] ;adjust the rest by 1 char
                         []))
                     (if (< prefix-count prev-count)
-                      [[(validate-items (apply conj prefix
+                      [[(validate-items (apply conj-compat prefix
                                           (drop (inc prefix-count) prev-candidate))
                           "remove 1 char")
                         next-num-of-changes]] ;remove 1 char
@@ -182,7 +182,7 @@
                        _ (validate-queue priority-moved-excluding-worse)
                        
                        priority-moved
-                       (apply conj
+                       (apply conj-compat
                          ;(re)inject any options that now look better. Being sets, conj keeps the items from the 1st set.
                          ;Hence the "better" set is the first param.
                          priority-moved-past-better
@@ -246,7 +246,7 @@
                          backlog-next  (into backlog-keep (drop priority-next-count priority-keep))
                          _ (validate-queue backlog-next)]
                      (if (and (empty? priority-keep) (empty? backlog-keep))
-                       (str "Emptied " best-num)
+                       best-num #_emptied_all_options
                        (if (< @num-of-generations 350 #_250 #__400-too-much) ;limit number of generations - worthwhile for debugging
                          (do
                            (swap! num-of-generations inc)
@@ -261,7 +261,7 @@
 (= (conj (sorted-set-by #(compare (mod % 3) (mod %2 3)) 1 2) 4) #{1 2})
     
 (seq? '[])
-(seqable? [])
+#_(seqable? [])
     
     
     

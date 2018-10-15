@@ -1,6 +1,6 @@
 (require 'clojure.set)
 (require 'clojure.pprint)
-(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
+;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
 
 ;to reload this file in REPL, run:
 ;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/4Clojure05.clj")
@@ -261,7 +261,7 @@
 (= (conj (sorted-set-by #(compare (mod % 3) (mod %2 3)) 1 2) 4) #{1 2})
     
 (seq? '[])
-(seqable? [])
+;(seqable? [])
     
     
     

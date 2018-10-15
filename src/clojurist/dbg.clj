@@ -1,5 +1,16 @@
 (require 'clojure.pprint)
  
+(def conj-compat
+  (if
+    (or
+      (> (:major *clojure-version*) 1)
+      (> (:minor *clojure-version*) 4))
+    conj
+    (fn conj-compat
+      ([coll] coll)
+      ([coll & entries]
+       (apply conj coll entries)))))
+         
 ;TODO How to ensure the file is loaded as the first (or before a set of files), so that it re-defines 'fn' macro for them?
 ; -> future: redefine defn, fn
 
@@ -215,7 +226,7 @@
                       (list 'let `[~fun-holder ~fun] ;let allows us to separate any logs of the function-generating expression from the targt function call.
                         (if (seq args)
                           (list 'dbg-println "Args for" msg))
-                        (seq (apply conj ['dbg-call-f msg fun-holder] args)))))]
+                        (seq (apply conj-compat ['dbg-call-f msg fun-holder] args)))))]
       (concat
         (if scopeBackReferenceKeyword 
           (concat
@@ -264,7 +275,7 @@
           declare-let (list 'let [(symbol (str dbg-snapshot-prefix scopeForwardDefinitionKeyword)) 'dbg-indent-level])
           execute (concat
                     (list
-                      (seq (apply conj ['dbg-call msg] code))))]
+                      (seq (apply conj-compat ['dbg-call msg] code))))]
       (concat
         (if scopeBackReferenceKeyword 
           (concat
@@ -337,10 +348,10 @@
            lets []]
       (if params
         (if (symbol? (first params))
-          (recur (next params) (conj new-params (first params)) lets)
+          (recur (next params) (conj-compat new-params (first params)) lets)
           (let [gparam (gensym "p__")]
-            (recur (next params) (conj new-params gparam)
-                   (-> lets (conj (first params)) (conj gparam)))))
+            (recur (next params) (conj-compat new-params gparam)
+                   (-> lets (conj-compat (first params)) (conj-compat gparam)))))
         `(~new-params
           (let ~lets
            ~@body))))))
@@ -441,9 +452,9 @@
             bfs (reduce (fn [ret [b v g]] ;in CLJ source this used reduce1
                           (if (symbol? b)
                             ;g is the formal & given parameter name
-                            (conj ret g v)
+                            (conj-compat ret g v)
                             ;g is the formal, but generated, parameter name
-                            (conj ret g v b g)))
+                            (conj-compat ret g v b g)))
                   [] (map vector bs vs gs))]
         `(let ~bfs
             (loop* ~(vec (interleave gs gs))
@@ -480,8 +491,8 @@
             gs (map (fn [b] (if (symbol? b) b (gensym))) bs) ;a list of "formal" parameters received by loop & our generated funtion
             bfs (reduce (fn [ret [b v g]] ;in CLJ source this used reduce1
                           (if (symbol? b)
-                            (conj ret g v) 
-                            (conj ret g v b g))) ; g is the formal generated/helper parameter name
+                            (conj-compat ret g v) 
+                            (conj-compat ret g v b g))) ; g is the formal generated/helper parameter name
                   [] (map vector bs vs gs))]
         `(let ~bfs
             (loop* ~(vec (interleave gs gs))
@@ -508,8 +519,8 @@
         gs (map (fn [b] (if (symbol? b) b (gensym))) bs) ;formal parameter names - whether user-given or generated (for destructuring)
         bfs (reduce (fn [ret [b v g]] ;in CLJ source this used reduce1
                       (if (symbol? b)
-                        (conj ret g v) 
-                        (conj ret g v b g))) ; g is the formal generated/helper parameter name
+                        (conj-compat ret g v) 
+                        (conj-compat ret g v b g))) ; g is the formal generated/helper parameter name
               [] (map vector bs vs gs))
         fn-name (gensym "dbgloop")]
     `(let ~bfs
@@ -521,7 +532,7 @@
                        (dbgf ~fn-name ~@gs))]
     
            (dbgf ~fn-name ~@gs)))
-    #_(let ~(conj bfs
+    #_(let ~(conj-compat bfs
               'recur `(fn recur ~(vec gs))
               (let ~(vec (interleave bs gs)))
               ~@body)
