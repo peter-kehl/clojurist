@@ -1,10 +1,6 @@
 (require 'clojure.set)
 (require 'clojure.pprint)
-;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
-
-;to reload this file in REPL, run:
-;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/4Clojure05.clj")
-
+               
 ;http://www.4clojure.com/problem/101 Levenshtein Distance
 ;alternating wide and deep:
 ;-wide: generation of 1-step change alternatives
@@ -16,9 +12,19 @@
        (let [from (vec from) ;from string to a seq.
              target (vec target)
              num-of-generations (atom 0)
-             item-type nil #_clojure.lang.Keyword #_java.lang.Long #_java.lang.Character] ;if item-type is nil, then don't validate items
+             item-type nil #_clojure.lang.Keyword #_java.lang.Long #_java.lang.Character ;if item-type is nil, then don't validate items
+             conj (if
+                     (or
+                         (> (:major *clojure-version*) 1)
+                         (> (:minor *clojure-version*) 4))
+                     clojure.core/conj
+                     (fn conj-compat
+                       ([coll] coll)
+                       ([coll & entries]
+                        (apply clojure.core/conj coll entries))))]
          (letfn
-           [(validate-items
+           [
+            (validate-items
               ([candidate msg]
                (validate-items candidate msg true))
               ([candidate msg do-fail] ;do-fail is to allow/supress assert, because a failed assert discards recent output
@@ -45,8 +51,7 @@
                                    (#_dbg #_:first_pair-of-chars first pair-of-items)))]
                 #_TODO-for-end-of-prefix-onwards_change-each-index
                 #_TODO-merge-two-let
-                #_(dbg-println "Prev. candidate" prev-candidate "-> prefix" prefix)
-                (println "Prev. candidate" prev-candidate "-> prefix" prefix)
+                #_(println "Prev. candidate" prev-candidate "-> prefix" prefix)
                 (let [prev-count (count prev-candidate)
                       target-count (count target)
                       prefix-count (count prefix)
@@ -146,7 +151,7 @@
              (#_dbgf #_"validate priority" validate-queue backlog)
              (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
                (second (first priority)) ;this was supposed to be the (one) best result, but (at least for "kitten" -> "sitting" it wasn't reached!
-               (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.10 #_(tried 0.05, 0.30, 0.5)))) ;priority below a threshold, and backlog is non-empty => merge
+               (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.50#_(tried 0.05, 0.30, 0.5)))) ;priority below a threshold, and backlog is non-empty => merge
                  (recur (into priority backlog) (empty backlog) best-num-changes past-candidate-to-num) ;<<<
                  (let [priority-moved-unfiltered (into (#_dbg #_"empty priority" empty priority)
                                                    (next-generation priority))
@@ -240,14 +245,14 @@
                        backlog-keep (candidates-to-keep backlog)
                        _ (validate-queue backlog-keep)]
                    #_TODO-merge-previous-and-following-let
-                   (let [priority-next-count (Math/ceil #_int (* (count priority-keep) 0.02 #_(tried 0.02, 0.03, 0.10, 0.30 with num-of-gen. limit 100)))
+                   (let [priority-next-count (Math/ceil #_int (* (count priority-keep) 0.30 #_(tried 0.02, 0.03, 0.10, 0.30 with num-of-gen. limit 100)))
                          priority-next (into (empty priority) (take priority-next-count priority-keep))
                          _ (validate-queue priority-next)
                          backlog-next  (into backlog-keep (drop priority-next-count priority-keep))
                          _ (validate-queue backlog-next)]
                      (if (and (empty? priority-keep) (empty? backlog-keep))
-                       best-num
-                       (if (< @num-of-generations 350 #__400-too-much) ;limit number of generations - worthwhile for debugging
+                       best-num #_emptied_all_options
+                       (if (< @num-of-generations 350 #_250 #__400-too-much) ;limit number of generations - worthwhile for debugging
                          (do
                            (swap! num-of-generations inc)
                            (recur priority-next backlog-next best-num past-candidate-to-num-next))
@@ -261,7 +266,7 @@
 (= (conj (sorted-set-by #(compare (mod % 3) (mod %2 3)) 1 2) 4) #{1 2})
     
 (seq? '[])
-;(seqable? [])
+#_(seqable? [])
     
     
     
