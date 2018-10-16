@@ -32,7 +32,7 @@
 (if false
   ((fn [wset] ;1. Create map {word derivative(s)}. 2. Find a chain.
      (let [ws (vec wset)
-           ders (reduce ;ders will be a map of derivatives: {from [to1 to2 to3...]}
+           ders (reduce ;ders will be a map of derivatives: {from1 [to1-1 to1-2 to1-3...] from2 [to2-1 to2-2...}
                   (fn [mp [from to]]
                     (merge mp
                       (if (mp from)
