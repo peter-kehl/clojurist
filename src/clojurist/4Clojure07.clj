@@ -1,4 +1,5 @@
 (require 'clojure.set)
+(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
 
 ; http://www.4clojure.com/problem/102 intoCamelCase
 ; --https://lispcast.com/clojure-regex/
@@ -74,16 +75,17 @@
                     
                     from2new (conj to2orig to) ;new items that will be connected from 'from' and from all items already connected to 'from'
                     
+                    ;_ (dbg-println :from from :to to :from2orig from2orig :one2manyPlusDirect one2manyPlusDirect :to2orig to2orig :from2new from2new)
                     one2manyUpdated (into {}
                                       (map
                                         (fn [[source targets]]
-                                          (println :source source :targets targets)
+                                          ;(println :source source :targets targets)
                                           [source
                                            (if (or
-                                                 (= source from)
-                                                 (contains? targets from))
-                                               (clojure.set/union targets from2new)
-                                               targets)])
+                                                   (= source from)
+                                                   (contains? targets from))
+                                             (clojure.set/union targets from2new)
+                                             targets)])
                                         one2manyPlusDirect))
                     others (next more)]
                 (if others
@@ -91,25 +93,34 @@
                   one2manyUpdated)))]
         (println :one2many one2many)
         (reduce
-          (fn [res [[from targets]]]
-            (println :reduce res from targets)
+          (fn [res [from targets]]
+            ;(dbg-println :reduce-> res from targets)
             (let [joined
                   (apply conj
                     res
-                    (map #(do (println :map from %) (vector from %)) targets))]
+                    (map
+                      #(vector from %)
+                      targets))]
               (println :joined joined) 
               joined))
           #{}
           one2many))))
-(if true
+(if false
      (transit
        #{["cat" "man"] ["man" "snake"] ["spider" "cat"]}))
-(if true
+(if false
   (=
      (transit
        #{["cat" "man"] ["man" "snake"] ["spider" "cat"]})
      #{["cat" "man"] ["cat" "snake"] ["man" "snake"]
        ["spider" "cat"] ["spider" "man"] ["spider" "snake"]}))
+
+; #{[8 4] [9 3] [4 2] [27 9]} is stored in order: #{[27 9] [9 3] [8 4] [4 2]}
+(transit #{[8 4] [9 3] [4 2] [27 9]})
+
+(if false
+  (let [divides #{[8 4] [9 3] [4 2] [27 9]}]
+    (= (transit divides) #{[4 2] [8 4] [8 2] [9 3] [27 9] [27 3]})))
 
 
 

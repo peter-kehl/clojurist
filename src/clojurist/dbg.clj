@@ -3,8 +3,8 @@
 (def conj
   (if
     (or
-      (> (:major *clojure-version*) 1)
-      (> (:minor *clojure-version*) 4))
+        (> (:major *clojure-version*) 1)
+        (> (:minor *clojure-version*) 4))
     clojure.core/conj
     (fn conj-compat
       ([coll] coll)
