@@ -66,8 +66,10 @@
               (let [[from to :as pair] (first more)
                     ; abc2xyz are sets; from and to as per above;
                     ; orig means an applicable subset of original source/target items
-                    ; new means a (potentiall) new subset of source/target items
-                    ;from2orig (get one2many from #{})
+                    ; new means a (potentially) new subset of source/target items
+                    from2orig (get one2many from #{})
+                    one2manyPlusDirect (conj one2many [from (conj from2orig to)])
+                    
                     to2orig   (get one2many to #{})
                     
                     from2new (conj to2orig to) ;new items that will be connected from 'from' and from all items already connected to 'from'
@@ -75,13 +77,14 @@
                     one2manyUpdated (into {}
                                       (map
                                         (fn [[source targets]]
+                                          (println :source source :targets targets)
                                           [source
                                            (if (or
                                                  (= source from)
                                                  (contains? targets from))
                                                (clojure.set/union targets from2new)
                                                targets)])
-                                        one2many))
+                                        one2manyPlusDirect))
                     others (next more)]
                 (if others
                   (recur one2manyUpdated others)
@@ -89,9 +92,13 @@
         (println :one2many one2many)
         (reduce
           (fn [res [[from targets]]]
-            (apply conj
-              res
-              (map #(vector from %) targets)))
+            (println :reduce res from targets)
+            (let [joined
+                  (apply conj
+                    res
+                    (map #(do (println :map from %) (vector from %)) targets))]
+              (println :joined joined) 
+              joined))
           #{}
           one2many))))
 (if true
