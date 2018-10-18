@@ -1,5 +1,6 @@
 (require 'clojure.pprint)
  
+
 (def conj
   (if
     (or
@@ -10,7 +11,9 @@
       ([coll] coll)
       ([coll & entries]
        (apply clojure.core/conj coll entries)))))
-         
+
+; different to org.clojure/tools.trace, because here we don't need extra parens ()
+
 ;TODO How to ensure the file is loaded as the first (or before a set of files), so that it re-defines 'fn' macro for them?
 ; -> future: redefine defn, fn
 

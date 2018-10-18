@@ -116,25 +116,147 @@
        ["spider" "cat"] ["spider" "man"] ["spider" "snake"]}))
 
 ; #{[8 4] [9 3] [4 2] [27 9]} is stored in order: #{[27 9] [9 3] [8 4] [4 2]}
-(transit #{[8 4] [9 3] [4 2] [27 9]})
+(if false
+  (transit #{[8 4] [9 3] [4 2] [27 9]}))
 
 (if false
   (let [divides #{[8 4] [9 3] [4 2] [27 9]}]
     (= (transit divides) #{[4 2] [8 4] [8 2] [9 3] [27 9] [27 3]})))
 
+;http://www.4clojure.com/problem/125
+; no macros e.g. #() - because they expand from (str 'code)!
+; ok to indent - because (str 'code) ignores extra whitespace
+(def gus (fn []))
+(gus)
+
+;(defmacro gusm[] '(fn []))
+
+( (fn [pref post]
+    (fn []))
+ "a" "b")
+
+
+(let [glob (fn [pref post] (let [x 1]))])
+
+(defmacro gusm[]
+  '(partial str [\( \)])
+  #_end)
+(gusm)
+;(println ((gusm)))
+
+; eval is not allowed
+(let [global '(fn [itself]
+                (str "(let [global '" itself "] ((eval global) global)"))]
+  ((eval global) global)
+  #_end)
+
+(eval '(eval 1))
+
+;EvalReader not allowed - *read-eval* is false
+(read-string "#=(identity 1)")
+;(identity "identity")
+
+;(char-escape-string \' ) ;only for string literal-special chars, not for e.g. () {}
+;clojure.string/escape
+
+;(clojure.string/replace "\\-\"c" #"([\"\\])" "\\\\$1")
+
+; it has to generate a function
+; it has to include outer ()
+; limit special characters
+
+;copied from the below prefixed with an apostrophe ' as '(let...):
+(let [esc (fn [text] (clojure.string/replace text "\"" "\\\"")) twice (fn [pre post] (list pre (esc pre) " " (esc post) post))] (fn [] (apply str (twice "((let [esc (fn [text] (clojure.string/replace text \"\\\"\" \"\\\\\\\"\")) twice (fn [pre post] (list pre (esc pre) \" \" (esc post) post))] (fn [] (apply str (twice" ")))))")))
+
+; to generate code for 4clojure.com, pust an apostrophe in front of (let ...), and copy the text of the generated tree.
+;(println
+ '(let [  esc (fn [text]
+                (clojure.string/replace text #"[\"\\]" "\\\\$0"))
+        twice (fn [pre post]
+                (list pre \" (esc pre) "\" \"" (esc post) \" post))]
+    (fn []
+      (apply str (twice "(let [esc (fn [text] (clojure.string/replace text #\"[\\\"\\\\]\" \"\\\\\\\\$0\")) twice (fn [pre post] (list pre \\\" (esc pre) \"\\\" \\\"\" (esc post) \\\" post))] (fn [] (apply str (twice " "))))")))))
+
+;the exact (unindented) solution:
+(let [esc (fn [text] (clojure.string/replace text #"[\"\\]" "\\\\$0")) twice (fn [pre post] (list pre \" (esc pre) "\" \"" (esc post) \" post))] (fn [] (apply str (twice "(let [esc (fn [text] (clojure.string/replace text #\"[\\\"\\\\]\" \"\\\\\\\\$0\")) twice (fn [pre post] (list pre \\\" (esc pre) \"\\\" \\\"\" (esc post) \\\" post))] (fn [] (apply str (twice " "))))"))))
+;------
+
+
+;http://www.4clojure.com/problem/128 
+;Suit: Spades, Hearts, Diamonds, and Clubs 
+;Rank: 2..9, 10 ("T"), Jack, Queen, King, and Ace -> here 0..12
+(def human2ord
+  (fn [[suit rank]]
+    {:suit ({\S :spade \H :heart \D :diamond \C :club} suit)
+     :rank (let [ascii (int rank)]
+             (if (<= ascii (int \9))
+               (- ascii (int \2))
+               ({\T 8 \J 9 \Q 10 \K 11 \A 12} rank)))}))
+
+(human2ord "CA")
+
+;http://www.4clojure.com/problem/178 best hand poker
 
 
 
+;http://www.4clojure.com/problem/130 tree reparent
+(def reparent
+  (fn [orig]))
+    
+    
 
+;http://www.4clojure.com/problem/111 crossword
+(def cross
+  (fn [goal mx]
+    ; row and col are 0-based; col is lower than num-cols, i.e. it "skips" whitespaces (assuming well/consistently-positioned whitespace)
+    (let [goal (seq goal)
+          places (fn [mixed] (filter #(not= \space %) mixed)) ;mixed is a row, or a column. See also coll-full.
+          first-row (mx 0)
+          num-cols (count (places first-row))
+          
+          col-full (fn [col]
+                     ; An outer (places ...) is not needed.
+                     (map #(nth
+                             (places %)
+                             col)
+                       mx))
+          row-full (fn [row]
+                     (places (mx row))) ;assuming "good" formatting
+          ;slice of a column, starting at [row col] position
+          col (fn [r-index c-index] (drop r-index (col-full c-index)))
+          row (fn [r-index c-index] (drop c-index (row-full r-index)))
+          
+          count-goal (count goal)
+          ;whether goal fits from the start of slice, up to end of slice or up to \#
+          fits (fn [slice]
+                 (and (or
+                          (= count-goal (count slice))
+                          (and (< count-goal (count slice))
+                               (= \# (nth slice count-goal))))
+                      (every? identity ;can't (apply and ...) because and is a macro
+                        (map #(#{% \_} %2) goal slice))))
+          place (fn [r-index c-index] ;it expects "good" formatting
+                  (nth (row-full r-index) c-index))]
+      
+      (boolean
+        (some identity
+          (for [r-index (range 0 (count mx))
+                c-index (range 0 num-cols)]
+            (or (and (or (zero? c-index)
+                         (= \# (place r-index (dec c-index))))
+                     (fits (row r-index c-index)))
+                (and (or (zero? r-index)
+                         (= \# (place (dec r-index) c-index)))
+                     (fits (col r-index c-index))))))))))
+    
+    
 
-
-
-
-
-
-
-
-
+(cross "joy" ["c _ _ _"
+              "d _ # e"
+              "r y _ _"])
+(cross "the" ["c _ _ _"
+              "d _ # e"
+              "r y _ _"])
 
 
 
