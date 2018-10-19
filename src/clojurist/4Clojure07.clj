@@ -1,5 +1,5 @@
 (require 'clojure.set)
-(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
+;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
 
 ; http://www.4clojure.com/problem/102 intoCamelCase
 ; --https://lispcast.com/clojure-regex/
@@ -248,15 +248,84 @@
                 (and (or (zero? r-index)
                          (= \# (place (dec r-index) c-index)))
                      (fits (col r-index c-index))))))))))
-    
-    
+(if false
+ (cross "joy" ["c _ _ _"
+               "d _ # e"
+               "r y _ _"]))
+(if false
+ (cross "the" ["c _ _ _"
+               "d _ # e"
+               "r y _ _"]))
 
-(cross "joy" ["c _ _ _"
-              "d _ # e"
-              "r y _ _"])
-(cross "the" ["c _ _ _"
-              "d _ # e"
-              "r y _ _"])
+;http://www.4clojure.com/problem/195 Parenthesis combinations
+; (((( ))))
+; n =>> n+1: ( around ), () before, with () in - at any index, after ()
+; NOT handling: with in n - but ( around a subset ) of n - at any possible index
+; - if the result is whole within (), then such a result can be accomplished by the above rule: ( around )
+; - otherwise the result is within 2+ () groups. Each was generated at lower level. It should have been
+;   embraced in another top level () pair as per above rules.
+(def parens
+  (fn [target-n]
+    (loop [prev #{""}
+           prev-n 0]
+      (if (= target-n prev-n)
+         prev
+         (let [n (inc prev-n)
+               expand (fn [grp]
+                        (assert (= (* 2 prev-n) (count grp)))
+                        (#_dbgf #_"apply conj" apply conj ()
+                          (#_dbgf #_"str1" str \( grp \))
+                          (#_dbgf #_"str2" str grp "()")
+                          (for [i (range 0 (count grp))]
+                            (#_dbgf #_"for-> str" str (subs grp 0 i) "()" (subs grp i)))))]
+           
+           (recur
+             (into #{} ;about the same speed as apply conj #{}...
+               (apply concat
+                 (#_dbgf #_"map" map expand prev)))
+             n))))))
+
+(def parens
+  (fn [target-n]
+    (loop [prev #{""}
+           prev-n 0]
+      (if (= target-n prev-n)
+         prev
+         (let [n (inc prev-n)
+               expand (fn [grp]
+                        (assert (= (* 2 prev-n) (count grp)))
+                        (into ;around the same speed as: apply conj (str...) (str...) (for....)
+                          (list (#_dbgf #_"str1" str \( grp \))
+                                (#_dbgf #_"str2" str grp "()"))
+                          (for [i (range 0 (count grp))]
+                            (#_dbgf #_"for-> str" str (subs grp 0 i) "()" (subs grp i)))))]
+           
+           (recur
+             (into #{} ;about the same speed as apply conj #{}...
+               (apply concat ;5% faster than: reduce into #{}
+                 (#_dbgf #_"map" map expand prev)))
+             n))))))
+(parens 0)
+(parens 1)
+(parens 2)
+#_(count (parens 10))
+#_(time (= (nth (sort (parens 12)) 5000) "(((((()()()()()))))(()))")) ;2.1 sec
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
