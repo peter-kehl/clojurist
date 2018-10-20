@@ -1,16 +1,16 @@
 (require 'clojure.pprint)
  
 
-(def conj
-  (if
-    (or
-        (> (:major *clojure-version*) 1)
-        (> (:minor *clojure-version*) 4))
-    clojure.core/conj
-    (fn conj-compat
-      ([coll] coll)
-      ([coll & entries]
-       (apply clojure.core/conj coll entries)))))
+#_(def conj
+   (if
+     (or
+         (> (:major *clojure-version*) 1)
+         (> (:minor *clojure-version*) 4))
+     clojure.core/conj
+     (fn conj-compat
+       ([coll] coll)
+       ([coll & entries]
+        (apply clojure.core/conj coll entries)))))
 
 ; different to org.clojure/tools.trace, because here we don't need extra parens ()
 
