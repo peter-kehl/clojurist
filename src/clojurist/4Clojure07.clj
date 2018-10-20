@@ -253,9 +253,9 @@
                "d _ # e"
                "r y _ _"]))
 (if false
- (cross "the" ["c _ _ _"
-               "d _ # e"
-               "r y _ _"]))
+  (cross "the" ["c _ _ _"
+                "d _ # e"
+                "r y _ _"]))
 
 ;http://www.4clojure.com/problem/195 Parenthesis combinations
 ; (((( ))))
@@ -269,42 +269,54 @@
     (loop [prev #{""}
            prev-n 0]
       (if (= target-n prev-n)
-         prev
-         (let [n (inc prev-n)
-               expand (fn [grp]
-                        (assert (= (* 2 prev-n) (count grp)))
-                        (#_dbgf #_"apply conj" apply conj ()
-                          (#_dbgf #_"str1" str \( grp \))
-                          (#_dbgf #_"str2" str grp "()")
-                          (for [i (range 0 (count grp))]
-                            (#_dbgf #_"for-> str" str (subs grp 0 i) "()" (subs grp i)))))]
-           
-           (recur
-             (into #{} ;about the same speed as apply conj #{}...
-               (apply concat
-                 (#_dbgf #_"map" map expand prev)))
-             n))))))
+        prev
+        (let [n (inc prev-n)
+              expand (fn [grp]
+                       (assert (= (* 2 prev-n) (count grp)))
+                       (into ;around the same speed as: apply conj (str...) (str...) (for....)
+                         (list (#_dbgf #_"str1" str \( grp \))
+                           (#_dbgf #_"str2" str grp "()"))
+                         (for [i (range 0 (count grp))]
+                           (#_dbgf #_"for-> str" str (subs grp 0 i) "()" (subs grp i)))))]
+          
+          (recur
+            (into #{} ;about the same speed as apply conj #{}...
+              (apply concat ;% faster than: reduce into #{}
+                (#_dbgf #_"map" map expand prev)))
+            n))))))
 
+; start with ((((...)))), then move the rightmost \( step by step to the right (as far as possible)
+;            (()...())()
 (def parens
-  (fn [target-n]
-    (loop [prev #{""}
-           prev-n 0]
-      (if (= target-n prev-n)
-         prev
-         (let [n (inc prev-n)
-               expand (fn [grp]
-                        (assert (= (* 2 prev-n) (count grp)))
-                        (into ;around the same speed as: apply conj (str...) (str...) (for....)
-                          (list (#_dbgf #_"str1" str \( grp \))
-                                (#_dbgf #_"str2" str grp "()"))
-                          (for [i (range 0 (count grp))]
-                            (#_dbgf #_"for-> str" str (subs grp 0 i) "()" (subs grp i)))))]
-           
-           (recur
-             (into #{} ;about the same speed as apply conj #{}...
-               (apply concat ;5% faster than: reduce into #{}
-                 (#_dbgf #_"map" map expand prev)))
-             n))))))
+  (fn [n]
+    (if (zero? n)
+      #{}
+      (let [n-1 (dec n)]
+        
+        (dbgloop [prev (apply str (concat (repeat n \() (repeat n \))))
+                  res #{prev}]
+          ;(dbg-print :prev prev)
+          (let [rightmost-movable-opener (fn []
+                                           (dbgloop [pos n-1
+                                                     num-right-closers 0]
+                                             (if (zero? pos)
+                                               nil
+                                               (dbg "if =" if (= (nth prev pos) \()
+                                                 (if (> num-right-closers 1)
+                                                   pos
+                                                   (dbgrecur (dec pos) (dec num-right-closers)))
+                                                 (dbgrecur   (dec pos) (inc num-right-closers))))))
+                opener (dbgf rightmost-movable-opener)]
+            (if opener
+              (let [now (str
+                           (subs prev 0 opener))]
+                               
+                (dbgrecur now (conj res now)))
+              res)))))))
+                                                 
+                       
+      
+
 (parens 0)
 (parens 1)
 (parens 2)
