@@ -212,35 +212,42 @@
           ranks (#_dbgf map :rank strucs)
           _ (println :ranks ranks)
           
-          same-rank (apply = suits)
-          each-rank-unique (= (count (into #{} ranks)) 5) ;each rank unique; with new CLJ could use (dedupe ..)
+          same-suit (apply = suits)
+          each-rank-unique (= (count (into #{} ranks)) 5) ;each rank unique. Instead, could use (distinct ...), or with new CLJ could use (dedupe ..)
           
           standard-sequence (and each-rank-unique
                                  (= (- (apply max ranks) (apply min ranks))
                                     4))
           _ (println :standard-sequence standard-sequence)
-          #_by-rank-rev-inv #_(into (sorted-map-by #(> (count %) (count %2))) (clojure.set/map-invert (group-by :rank strucs)))
-          seq-by-rank-rev-inv (sort-by
-                                (comp - count first) ;most frequent rank first; can't use sort-by neither reverse, as those turn a map into a sequence - bad for (vals ...) below
-                                (clojure.set/map-invert
-                                  (group-by :rank strucs)))
-          _ (println :by-rank-rev-inv seq-by-rank-rev-inv)
+          map-by-rank-rev-inv (#_dbgf #_"into" into
+                                (#_dbgf sorted-map-by (fn [vec1 vec2] ; reverse; partial order by number of cards per rank, then any consistent (hence by (str ...))
+                                                        (if (= (count vec1) (count vec2))
+                                                          ;vectors are comparable, but their components - maps - are not! Hence (str ...)
+                                                          (#_dbgf compare (str vec2) (str vec1)) ;reverse, hence param vec2 first
+                                                          (#_dbgf > (count vec1) (count vec2))))) ;reverse, hence op. >
+                                (clojure.set/map-invert (group-by :rank strucs)))
+          Xseq-by-rank-rev-inv (sort-by
+                                 (comp - count first) ;most frequent rank first; can't use sort-by neither reverse, as those turn a map into a sequence - bad for (vals ...) below
+                                 (clojure.set/map-invert
+                                   (group-by :rank strucs)))
+          _ (println :by-rank-rev-inv map-by-rank-rev-inv)
           nth-frequent-rank-occurrence (fn [pos]
-                                         (#_dbgf #_"count nth seq" count (key (nth seq-by-rank-rev-inv pos))))]
+                                         ;(#_dbgf #_"count nth seq" count (key (nth seq-by-rank-rev-inv pos)))
+                                         (#_dbgf #_"count nth seq" count (nth (keys map-by-rank-rev-inv) pos)))]
       ;three-of-a-kind (= (nth-frequent-rank-occurrence 0) 3)]
       (cond
-        (and same-rank standard-sequence)
+        (and same-suit standard-sequence)
         :straight-flush
         
         #_(some (fn [[_ cards]] (= (count cards) 4)) by-rank)
         (= (nth-frequent-rank-occurrence 0) 4)
         :four-of-a-kind
         
-        (and (= (count seq-by-rank-rev-inv) 2)
+        (and (= (count map-by-rank-rev-inv) 2)
              (= (nth-frequent-rank-occurrence 0) 3)) ;the other group must have 2 cards, since we have 2 groups only
         :full-house
         
-        same-rank
+        same-suit
         :flush
         
         (or standard-sequence
@@ -428,6 +435,7 @@
                 (recur now (conj res now)))
               res)))))))
 
+; The following runs out of heap memory even at (parens 10), very slow at n=7!
 ; the above was not covering all: n=3 -> only  #{"(()())" "((()))" "()()()" "(())()"}
 ; missing (()()) -> ()(()) <-- when moving to the right the 2nd/3rd/farther... rightmost opener first
 ; -> then "jump over" the other rightmost opener(s)
