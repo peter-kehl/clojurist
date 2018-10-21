@@ -490,7 +490,103 @@
 #_(time (= (nth (sort (parens 12)) 5000) "(((((()()()()()))))(()))")) ;2.1 sec with strings; 7.4sec with vectors!
 
 
+;http://www.4clojure.com/problem/124 Reversi game available moves. https://en.wikipedia.org/wiki/Reversi:
+; any disks of the opponent's color that are in a straight line and bounded by
+;  the disk just placed and another disk of the current player's color are turned over to the current player's color. 
+  ; - a valid move is one where at least one piece is reversed. 
+(def reversi
+  (fn [board my-colour]
+    (let [colour-at (fn [coordinates]
+                      {:pre (= (count coordinates) 2)
+                       :post [(not= % nil)]};))}
+                      (get-in board coordinates))
+          move-to-pos (fn [[from-x from-y :as from] [change-x change-y]] ;return new coordinates
+                        {:pre  [(colour-at from) (<= -1 change-x 1) (<= -1 change-y 1)]
+                         :post [(colour-at %) (not= % from)]}
+                        [(+ from-x change-x) (+ from-y change-y)])
+          width 4
+          max-pos (dec width)
+          
+          ; get all physically available directions & max distance (1..3) per available direction
+          direction-radius (fn [[from-x from-y :as from]] ; return {[change-x change-y] max-distance...}
+                             {:pre [(colour-at from)]}
+                             (into {}
+                               (for [change-x '(-1 0 1)
+                                     change-y (if (not= change-x 0)
+                                                '(-1 0 1)
+                                                '(-1   1))
+                                     :let [farthest
+                                           (some (fn [distance]
+                                                   (let [
+                                                         x (+ from-x (* change-x distance))
+                                                         y (+ from-y (* change-y distance))]
+                                                     (if (and 
+                                                              (<= 0 x max-pos)
+                                                              (<= 0 y max-pos))
+                                                       distance)))
+                                             (range max-pos -1 -1))]
+                                     :when farthest]
+                                 [[change-x change-y] farthest])))
+          
+          
+          direction-distance-pos (fn [[from-x from-y :as from] [change-x change-y] distance]
+                                   {:pre (colour-at from)
+                                    :post (colour-at %)}
+                                   [(+ from-x (* change-x distance))
+                                    (+ from-y (* change-y distance))])
+          
+          positions-by-colour (fn [colour]
+                                (for [x (range 0 width)
+                                      y (range 0 width)
+                                      :when (= (colour-at [x y]) colour)]
+                                  [x y]))
+          
+          other-colour (fn [col] ({'b 'w 'w 'b} col))
+          mine? (fn [pos] (= (colour-at pos) my-colour))
+          hers? (fn [pos] (= (colour-at pos) (other-colour my-colour)))
+          
+          moves (fn []
+                  (into {}
+                    (for [free (positions-by-colour 'e)
+                          :let [conquered (apply concat
+                                            (for [[dir rad] (direction-radius free)
+                                                  :when (> rad 1)
+                                                  dis (range 2 (inc rad))
+                                                  :while (hers? (direction-distance-pos free dir (dec dis)))
+                                                  :let   [mine  (direction-distance-pos free dir      dis)]
+                                                  :when  (mine? mine)]
+                                              (map ;collect conquered pieces in this direction
+                                                (partial direction-distance-pos free dir)
+                                                (range 1 dis))))]
+                          :when (seq conquered)]
+                      [free (into #{} conquered)])))]
+      (moves))))
+      
+;           0 1 2 3
+(reversi '[[e e e e]
+           [e w b e]
+           [e b w e]
+           [e e e e]] 'w)   
+{[1 3] #{[1 2]}, [0 2] #{[1 2]}, [3 1] #{[2 1]}, [2 0] #{[2 1]}}
 
+(reversi '[[e e e e]
+           [e w b e]
+           [w w w e]
+           [e e e e]] 'b)  
+{[3 2] #{[2 2]}, [3 0] #{[2 1]}, [1 0] #{[1 1]}}
+
+;           0 1 2 3
+(reversi '[[e e e e]
+           [e w b e]
+           [w w b e]
+           [e e b e]] 'w)       
+{[0 3] #{[1 2]}, [1 3] #{[1 2]}, [3 3] #{[2 2]}, [2 3] #{[2 2]}}
+
+(reversi '[[e e w e]
+           [b b w e]
+           [b w w e]
+           [b w w w]] 'b)  
+{[0 3] #{[2 1] [1 2]}, [1 3] #{[1 2]}, [2 3] #{[2 1] [2 2]}}      
 
 
 
