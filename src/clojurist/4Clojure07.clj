@@ -620,7 +620,7 @@
           
           ; (view ...) used to throw on wrong index(es) - so that get-square can catch it easily. But 4clojure refuses (catch...)
           view (fn [shifts x y] ;nil if not present
-                 (get (get vecs x) (- y (shifts x))))
+                 (get (nth vecs x) (- y (nth shifts x))))
           
           square? (fn [square]
                     (let [size (count square)]
@@ -635,12 +635,12 @@
           
           get-square (fn [shifts top-left-x top-left-y size] ;return nil if no such square
                        ;{:post [(or (nil? %) (square? %))]}
-                       (let [result (map vec ;we only need the result to act as a function (i.e. a vector) only at the top dimension - of rows
-                                      (for    [x (range 0 size)]
-                                        (for  [y (range 0 size)
-                                               :let [cell (view shifts (+ x top-left-x) (+ y top-left-y))]
-                                               :while cell]
-                                          cell)))]
+                       (let [axis-range (range 0 size)
+                             result (for    [x axis-range]
+                                      (for  [y axis-range
+                                             :let [cell (view shifts (+ x top-left-x) (+ y top-left-y))]
+                                             :while cell]
+                                        cell))]
                          ;(dbg-println "potential result:") (pprint-one-square result)
                          (if (every?
                                ;if cell was nil, it was *not* appended to the row (due to the above :while). Such a row is shorter.
@@ -665,29 +665,28 @@
                    (let [horizontal (horizontal-latin? square)]
                      (and horizontal
                           (let [columns (for [col-index (range 0 (count square))]
-                                          (map #(% col-index) square))]
+                                          (map #(nth % col-index) square))]
                             (= (horizontal-latin? columns) horizontal)))))
           
-          ; a list of vectors, each cell containing a shift (0 or higher) of its respective vector (row) in vecs[]. 
+          ; a list of sequences, each cell containing a shift (0 or higher) of its respective vector (row) in vecs[]. 
           groups-of-shifts (letfn [(sub-shifts-since-level [level]
                                      (let [results-below (if (< level max-x) #_alternativ-to-memoize
                                                            (sub-shifts-since-level (inc level))
                                                            :unused)]
-                                       (map vec ;so that we can call it (with one param, which is an index)  
-                                         (apply concat
-                                           (for [shift (range 0 (inc (- width (count (vecs level)))))]
-                                             (if (= level max-x)
-                                               [[shift]]
-                                               (map
-                                                 (partial cons shift)
-                                                 results-below)))))))]
+                                       (apply concat
+                                         (for [shift (range 0 (inc (- width (count (vecs level)))))]
+                                           (if (= level max-x)
+                                             [[shift]]
+                                             (map
+                                               #(cons shift %) ;alternative: (partial cons shift)
+                                               results-below))))))]
                              (sub-shifts-since-level 0))
           ;_ (clojure.pprint/pprint groups-of-shifts)
           
           squares (distinct (for [top-left-x (range 0 max-x) ;excluding the last row, since squares have size >=2
                                   top-left-y (range 0 max-y)
                                   size (range 2 (min (inc (- width  top-left-y))
-                                                     (inc (- height top-left-x))))
+                                                  (inc (- height top-left-x))))
                                   shifts groups-of-shifts
                                   :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
                                         square (get-square shifts top-left-x top-left-y size)]
