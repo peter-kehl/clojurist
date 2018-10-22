@@ -634,7 +634,7 @@
                            (println)) ;(count ...) because (map...) is lazy
           
           get-square (fn [shifts top-left-x top-left-y size] ;return nil if no such square
-                       {:post [(or (nil? %) (square? %))]}
+                       ;{:post [(or (nil? %) (square? %))]}
                        (let [result (map vec ;we only need the result to act as a function (i.e. a vector) only at the top dimension - of rows
                                       (for    [x (range 0 size)]
                                         (for  [y (range 0 size)
@@ -661,7 +661,7 @@
           ;this would need some of the above anyway: (apply = (map (partial into #{}) slices))
           
           latin? (fn [square]
-                   {:pre [(square? square)]}
+                   ;{:pre [(square? square)]}
                    (let [horizontal (horizontal-latin? square)]
                      (and horizontal
                           (let [columns (for [col-index (range 0 (count square))]
@@ -673,7 +673,7 @@
                                      (let [results-below (if (< level max-x) #_alternativ-to-memoize
                                                            (sub-shifts-since-level (inc level))
                                                            :unused)]
-                                       (map vec ;so that we can call it (with one param being an index)  
+                                       (map vec ;so that we can call it (with one param, which is an index)  
                                          (apply concat
                                            (for [shift (range 0 (inc (- width (count (vecs level)))))]
                                              (if (= level max-x)
@@ -687,7 +687,7 @@
           squares (distinct (for [top-left-x (range 0 max-x) ;excluding the last row, since squares have size >=2
                                   top-left-y (range 0 max-y)
                                   size (range 2 (min (inc (- width  top-left-y))
-                                                  (inc (- height top-left-x))))
+                                                     (inc (- height top-left-x))))
                                   shifts groups-of-shifts
                                   :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
                                         square (get-square shifts top-left-x top-left-y size)]
