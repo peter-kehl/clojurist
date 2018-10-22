@@ -275,16 +275,16 @@
         :high-card))))
       
 
-(best-hand ["HA" "D2" "H3" "C9" "DJ"])
-(best-hand ["HA" "HQ" "SJ" "DA" "HT"])
-(best-hand ["HA" "DA" "HQ" "SQ" "HT"])
-(best-hand ["HA" "DA" "CA" "HJ" "HT"]) ;-> :three-of-a-kind
-(best-hand ["HA" "DK" "HQ" "HJ" "HT"]) ; straight
-(best-hand ["HA" "H2" "S3" "D4" "C5"]) ; straight
-(best-hand ["HA" "HK" "H2" "H4" "HT"])
-(best-hand ["HA" "DA" "CA" "HJ" "DJ"])
-(best-hand ["HA" "DA" "CA" "SA" "DJ"])
-(best-hand ["HA" "HK" "HQ" "HJ" "HT"])
+;(best-hand ["HA" "D2" "H3" "C9" "DJ"])
+;(best-hand ["HA" "HQ" "SJ" "DA" "HT"])
+;(best-hand ["HA" "DA" "HQ" "SQ" "HT"])
+;(best-hand ["HA" "DA" "CA" "HJ" "HT"]) ;-> :three-of-a-kind
+;(best-hand ["HA" "DK" "HQ" "HJ" "HT"]) ; straight
+;(best-hand ["HA" "H2" "S3" "D4" "C5"]) ; straight
+;(best-hand ["HA" "HK" "H2" "H4" "HT"])
+;(best-hand ["HA" "DA" "CA" "HJ" "DJ"])
+;(best-hand ["HA" "DA" "CA" "SA" "DJ"])
+;(best-hand ["HA" "HK" "HQ" "HJ" "HT"])
 
 
 ;http://www.4clojure.com/problem/130 tree reparent
@@ -606,12 +606,98 @@
           dirs #_from-top-left-clockwise [[-1 -1] [-1 0] [-1 1] [0 1] [1 1] [1 0] [1 -1] [0 -1]]
           numbered-dir #_rotate-index-overflow (fn [num] (dirs (rem num 8)))
           line (fn [])
-          right-of (fn [])
+          right-of (fn []) ;<<<<
           left-of (fn [])]
       1)))
   
+;http://www.4clojure.com/problem/152 LAtin Squares
+(def latin
+  (fn [vecs]
+    (let [height (count vecs)
+          max-x (dec height)
+          width (apply max (map count vecs))
+          max-y (dec width)
+          ;orig (fn [x y] ;return nil for not present
+          ;       (get (vecs x) y))
+          
+          view (fn [shifts x y] ;fail if not present - so that get-square can catch it easily
+                 ((vecs x) (+ y (shifts x))))
+          
+          get-square (fn [shifts top-left-x top-left-y size] ;return nil if no such square
+                       (try (map vec
+                               (for    [x (range 0 size)]
+                                 (for  [y (range 0 size)]
+                                    (let [cell (view shifts (+ x top-left-x) (+ y top-left-y))]
+                                      (if cell
+                                        cell
+                                        (throw (IndexOutOfBoundsException.)))))))
+                         (catch IndexOutOfBoundsException e nil)))
+          
+          ;return a set of items, if slices form a horizontally-latin square; false otherwise
+          horizontal-latin? (fn [slices]
+                              (let [first-as-set (into #{} (first slices))]
+                                (if (and (= (count first-as-set) (count slices))
+                                         (every?
+                                           #(= (into #{} %) first-as-set)
+                                           (rest slices)))
+                                  first-as-set
+                                  false)))
+                              ;this would need some of the above anyway: (apply = (map (partial into #{}) slices))
+                              
+          latin? (fn [square]
+                   (let [columns (for [col-index (range 0 (count square))]
+                                   (map #(% col-index) square))
+                         horizontal (horizontal-latin? square)]
+                      (and horizontal
+                           (= (horizontal-latin? columns) horizontal))))
+          
+          ; a list of vectors, each cell containing a shift (0 or higher) of its respective vector (row) in vecs[]. 
+          groups-of-shifts (letfn [(sub-shifts-since-level [level]
+                                     (let [results-below (if (< level max-x) #_alternativ-to-memoize
+                                                           (dbgf sub-shifts-since-level (inc level))
+                                                           :unused)]
+                                       (map vec ;so that we can call it (with one param being an index)  
+                                         (apply concat
+                                           (for [shift (range 0 (inc (- width (count (vecs level)))))]
+                                             (if (= level max-x)
+                                               [[shift]]
+                                               (map
+                                                 (partial cons shift)
+                                                 results-below)))))))]
+                             (dbgf sub-shifts-since-level 0))]
+      
+      (let [squares (distinct
+                      (for [top-left-x (range 0 max-x) ;excluding the last row, since squares have size >1
+                            top-left-y (range 0 max-y)
+                            size (range 2 (min (inc (- width  top-left-y))
+                                            (inc (- height top-left-x))))
+                            shifts groups-of-shifts
+                            :let [square (dbgf get-square shifts top-left-x top-left-y size)]
+                            :when (and square (dbgf "latin?" latin? square))]
+                        square))]
+        (into {}
+          (map
+            (fn [[size sqs]]
+              [size (count sqs)])
+            (group-by count squares)))))))
 
-
+(if false
+  (latin '[[A B C D]
+           [A C D B]
+           [B A D C]
+           [D C A B]]))        
+(if false
+  (latin '[[A B C D E F]
+           [B C D E F A]
+           [C D E F A B]
+           [D E F A B C]
+           [E F A B C D]
+           [F A B C D E]]))  
+(if true
+  (latin '[[A B C D]
+           [B A D C]
+           [D C B A]
+           [C D A B]]))
 
 
 
