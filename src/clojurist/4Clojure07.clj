@@ -662,11 +662,11 @@
           
           latin? (fn [square]
                    {:pre [(square? square)]}
-                   (let [columns (for [col-index (range 0 (count square))]
-                                   (map #(% col-index) square))
-                         horizontal (horizontal-latin? square)]
+                   (let [horizontal (horizontal-latin? square)]
                      (and horizontal
-                          (= (horizontal-latin? columns) horizontal))))
+                          (let [columns (for [col-index (range 0 (count square))]
+                                          (map #(% col-index) square))]
+                            (= (horizontal-latin? columns) horizontal)))))
           
           ; a list of vectors, each cell containing a shift (0 or higher) of its respective vector (row) in vecs[]. 
           groups-of-shifts (letfn [(sub-shifts-since-level [level]
@@ -693,7 +693,7 @@
                                         square (get-square shifts top-left-x top-left-y size)]
                                   :when square]
                               square))
-          _ (pprint-squares squares)
+          ;_ (pprint-squares squares)
           latin-squares (distinct
                           (filter latin? squares))]
       
