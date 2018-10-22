@@ -563,32 +563,53 @@
       (moves))))
       
 ;           0 1 2 3
-(reversi '[[e e e e]
-           [e w b e]
-           [e b w e]
-           [e e e e]] 'w)   
+(if false
+  (reversi '[[e e e e]
+             [e w b e]
+             [e b w e]
+             [e e e e] 'w]))   
 {[1 3] #{[1 2]}, [0 2] #{[1 2]}, [3 1] #{[2 1]}, [2 0] #{[2 1]}}
 
-(reversi '[[e e e e]
-           [e w b e]
-           [w w w e]
-           [e e e e]] 'b)  
+(if false
+  (reversi '[[e e e e]
+             [e w b e]
+             [w w w e]
+             [e e e e] 'b]))  
 {[3 2] #{[2 2]}, [3 0] #{[2 1]}, [1 0] #{[1 1]}}
 
 ;           0 1 2 3
-(reversi '[[e e e e]
-           [e w b e]
-           [w w b e]
-           [e e b e]] 'w)       
+(if false
+  (reversi '[[e e e e]
+             [e w b e]
+             [w w b e]
+             [e e b e] 'w]))       
 {[0 3] #{[1 2]}, [1 3] #{[1 2]}, [3 3] #{[2 2]}, [2 3] #{[2 2]}}
 
-(reversi '[[e e w e]
-           [b b w e]
-           [b w w e]
-           [b w w w]] 'b)  
+(if false
+   (reversi '[[e e w e]
+              [b b w e]
+              [b w w e]
+              [b w w w] 'b]))  
 {[0 3] #{[2 1] [1 2]}, [1 3] #{[1 2]}, [2 3] #{[2 1] [2 2]}}      
 
-
+;http://www.4clojure.com/problem/127 Triangles
+;the comments in examples suggest a transformation, but they're only to illustrate only!
+;the return value is the size of the area, or nil.
+;How do it? Pick a corner point. Take one of 8 directions - one side of triangle.
+;The other side of triangle has two options: the next (neighbouring) direction (45 degrees)
+;or the second next direction (90 degrees).
+(def triangle
+  (fn [decimals]
+    (let [mx (for [line decimals
+                   digit (seq (Integer/toString line 2))]
+               ({\0 false \1 true} digit))
+          dirs #_from-top-left-clockwise [[-1 -1] [-1 0] [-1 1] [0 1] [1 1] [1 0] [1 -1] [0 -1]]
+          numbered-dir #_rotate-index-overflow (fn [num] (dirs (rem num 8)))
+          line (fn [])
+          right-of (fn [])
+          left-of (fn [])]
+      1)))
+  
 
 
 
