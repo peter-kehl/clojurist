@@ -683,15 +683,52 @@
                              (sub-shifts-since-level 0))
           ;_ (clojure.pprint/pprint groups-of-shifts)
           
-          squares (distinct (for [top-left-x (range 0 max-x) ;excluding the last row, since squares have size >=2
-                                  top-left-y (range 0 max-y)
-                                  size (range 2 (min (inc (- width  top-left-y))
-                                                  (inc (- height top-left-x))))
-                                  shifts groups-of-shifts
-                                  :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
-                                        square (get-square shifts top-left-x top-left-y size)]
-                                  :when square]
-                              square))
+          max-size (min width height)
+          ;Get all possible squares. High-level optimisation: Keep a track of *slices* (i.e. consecutive parts) of length 2 or more of
+          ;already processed shifts. Skip collecting squares of the size & location that fits into
+          ;those already processed shifts. (This optimisation is partial, as two different shifts may shift
+          ;two or more neighbouring rows by the same shift.)
+          ;prev-shift-slices set of maps #{ {index-of-row shift-for-that-row...}... } for two or more consecutive rows.
+          ;If vecs[] has more than two rows, then any shift generates multiple entries in prev-shift-slices #{},
+          ;to cover all combinations of two or more consecutive rows.
+          ;Because we're caching/skipping based on shifts, each (loop) iteration processes one shift completely.
+          squares (loop [prev-shift-slices #{}
+                         shifts-leftover groups-of-shifts
+                         res #{}]
+                    (let [shifts (first shifts-leftover)
+                          ;specific per size, because squares of different size (generally) don't share parts
+                          pack-shift-slice (fn [top-x size] (into {}
+                                                              (map
+                                                                (fn [x] [x (nth shifts x)])
+                                                                (range top-x (+ top-x size)))))
+                          res-and-shifted-slices-new
+                          (for  [size (range 2 (inc max-size))
+                                   ;(inc (- height top-left-x))))
+                                   :let [top-x-to-packed-shift-slice ;List of pairs [top-x (pack-shift-slice ...)]
+                                                                       (for [top-x (range 0 (inc (- height size)))
+                                                                             :let [shift-slice (pack-shift-slice top-x size)]
+                                                                             :when (not (prev-shift-slices shift-slice))]
+                                                                         [top-x shift-slice])
+                                         top-left-y-range (range 0 (inc (- width size)))] ;excluding the last, since squares have size >=2
+                                 [top-left-x shift-slice] top-x-to-packed-shift-slice            ;(range 0 (inc (- height size)))#_TODO
+                                 ;:when (not (excluded-top-rows top-left-x))
+                                 top-left-y top-left-y-range
+                                 
+                                 :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
+                                       square (get-square shifts top-left-x top-left-y size)]
+                                 :when square]
+                            [square shift-slice])
+                          res-new (map first res-and-shifted-slices-new)
+                          res-next (into res res-new)
+                          shift-slices-new (map second res-and-shifted-slices-new)
+                          shift-slices-next (into prev-shift-slices shift-slices-new)
+                          shifts-leftover-next (next shifts-leftover)]
+                      (if shifts-leftover-next
+                        (recur
+                          shift-slices-next
+                          shifts-leftover-next
+                          res-next)
+                        res-next)))
           ;_ (pprint-squares squares)
           latin-squares (distinct
                           (filter latin? squares))]
@@ -701,7 +738,14 @@
           (fn [[size sqs]]
             [size (count sqs)])
           (group-by count latin-squares))))))
-(if true
+(if false
+  (latin [[8 6 7 3 2 5 1 4]
+          [6 8 3 7]
+          [7 3 8 6]
+          [3 7 6 8 1 4 5 2]
+          [1 8 5 2 4]
+          [8 1 2 4 5]]))
+(if false
 ; indexes  0 1 2 3 4 5
   (latin [[3 1 2]
           [1 2 3 1 3 4]
