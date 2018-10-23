@@ -28,18 +28,15 @@
                              #(range 0 %)
                              (range 0 (inc (max width height))))) ;even though we use size >=2, this must start at 0 so it's indexable
           ;_ (println "axis-ranges" axis-ranges)
-          get-square (fn [shifts top-left-x top-left-y size] ;return nil if no such square
+          get-square (fn [top-left-x top-left-y size view] ;vec of vecs (with no nil), or nil if no such square (e.g. if a cell would be nil otherwise)
                        ;{:post [(or (nil? %) (square? %))]}
                        (let [axis-range (axis-ranges size)
-                             result (for    [x axis-range]
-                                      (for  [y axis-range
-                                             :let [cell (view shifts (+ x top-left-x) (+ y top-left-y))]
-                                             :while cell]
-                                        cell))]
+                             top-right-y+1 (+ top-left-y size)
+                             result (vec (for    [x-within-square axis-range]
+                                           (subvec (view (+ x-within-square top-left-x)) top-left-y top-right-y+1)))]
                          ;(dbg-println "potential result:") (pprint-one-square result)
                          (if (every?
-                               ;if cell was nil, it was *not* appended to the row (due to the above :while). Such a row is shorter.
-                               (fn [row] (= (count row) size))
+                               (fn [row] (every? #(not (nil? %)) row))
                                result)
                            result
                            nil)))
@@ -74,7 +71,7 @@
                    (let [horizontal (horizontal-latin? square)]
                      (and horizontal
                           (let [columns (for [col-index (axis-ranges (count square))] ;rotate columns into rows
-                                          (map #(nth % col-index) square))]
+                                          (map #(% col-index) square))]
                             (= (horizontal-latin? columns) horizontal)))))
           x-range (axis-ranges height)
           y-range (axis-ranges width)
@@ -93,21 +90,21 @@
                     (let [shifts (first shifts-leftover)
                           ; seq. of seqs, where first cell is a seq. with 2-D indexes like for prev-shifted-rows, and second cell is a value (shifted row). This structure is easy to (apply assoc-in result-map ...)
                           shifted-rows-new (for [x x-range
-                                                  :let [shift (nth shifts x)
-                                                        old (get-in prev-shifted-rows (list x shift))]
-                                                  :when (nil? old)]
-                                              (let [row-orig (vecs-orig x)
-                                                    row (vec (concat
-                                                               (repeat shift nil)
-                                                               row-orig
-                                                               (repeat (- width shift (count row-orig)) nil)))] ;repeat accepts negative n => empty seq ()
-                                                (list (list x shift) row)))
+                                                 :let [shift (nth shifts x)
+                                                       old (get-in prev-shifted-rows (list x shift))]
+                                                 :when (nil? old)]
+                                             (let [row-orig (vecs-orig x)
+                                                   row (vec (concat
+                                                              (repeat shift nil)
+                                                              row-orig
+                                                              (repeat (- width shift (count row-orig)) nil)))] ;repeat accepts negative n => empty seq ()
+                                               (list (list x shift) row)))
                           shifted-rows-next (reduce
                                               (fn [res x-shift-row]
                                                 (apply assoc-in res x-shift-row))
                                               prev-shifted-rows
                                               shifted-rows-new) 
-                          ;view is a 2-dimensional height X width vec[] of vecs-orig[], a representation of vecs-orig[] with applied shifts[]
+                          ;a 2-dimensional height X width vector of vectors, a representation of vecs-orig[] with applied shifts[]
                           view (vec (for [x x-range]
                                       (get-in shifted-rows-next (list x (nth shifts x)))))
                           ;specific per size, because squares of different size (generally) don't share parts
@@ -128,7 +125,7 @@
                                  [top-left-x shift-slice] top-x-to-packed-shift-slice]
                             [(for [top-left-y top-left-y-range
                                    :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
-                                         square (#_dbgf get-square shifts top-left-x top-left-y size)]
+                                         square (#_dbgf get-square top-left-x top-left-y size view)]
                                    :when square] ;TODO 0. start with the rightmost column of the square (item set reused for -> #2) 1. add only if latin 2. then check +size-1 column to the right. Perform the whole check only if both columns have same item set.
                                ;                    \-> pass the reference column and its position, or the index set of the rest of the columns, as a parameter to latin?
                                square)
