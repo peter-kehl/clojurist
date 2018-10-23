@@ -617,10 +617,11 @@
           max-x (dec height)
           width (apply max (map count vecs))
           max-y (dec width)
+          max-size (min width height)
           
           ; (view ...) used to throw on wrong index(es) - so that get-square can catch it easily. But 4clojure refuses (catch...)
           view (fn [shifts x y] ;nil if not present
-                 (get (nth vecs x) (- y (nth shifts x))))
+                 (get (vecs x) (- y (nth shifts x))))
           
           square? (fn [square]
                     (let [size (count square)]
@@ -633,9 +634,13 @@
                                     squares))
                            (println)) ;(count ...) because (map...) is lazy
           
+          axis-ranges (vec (map ;axis-ranges[] is vector: size => range 0..size-1.
+                             #(range 0 %)
+                             (range 0 (inc max-size)))) ;even though we use size >=2, this must start at 0 so it's indexable
+          ;_ (println "axis-ranges" axis-ranges)
           get-square (fn [shifts top-left-x top-left-y size] ;return nil if no such square
                        ;{:post [(or (nil? %) (square? %))]}
-                       (let [axis-range (range 0 size)
+                       (let [axis-range (axis-ranges size)
                              result (for    [x axis-range]
                                       (for  [y axis-range
                                              :let [cell (view shifts (+ x top-left-x) (+ y top-left-y))]
@@ -649,7 +654,7 @@
                            result
                            nil)))
           
-          ;return a set of items, if slices form a horizontally-latin square; false otherwise
+          ;return a set of items, if slices (rows) form a horizontally-latin square; false otherwise
           horizontal-latin? (fn [slices]
                               (let [first-as-set (into #{} (first slices))]
                                 (if (and (= (count first-as-set) (count slices))
@@ -664,7 +669,7 @@
                    ;{:pre [(square? square)]}
                    (let [horizontal (horizontal-latin? square)]
                      (and horizontal
-                          (let [columns (for [col-index (range 0 (count square))]
+                          (let [columns (for [col-index (range 0 (count square))] ;rotate columns into rows
                                           (map #(nth % col-index) square))]
                             (= (horizontal-latin? columns) horizontal)))))
           
@@ -683,7 +688,6 @@
                              (sub-shifts-since-level 0))
           ;_ (clojure.pprint/pprint groups-of-shifts)
           
-          max-size (min width height)
           ;Get all possible squares. High-level optimisation: Keep a track of *slices* (i.e. consecutive parts) of length 2 or more of
           ;already processed shifts. Skip collecting squares of the size & location that fits into
           ;those already processed shifts. (This optimisation is partial, as two different shifts may shift
@@ -703,22 +707,23 @@
                                                                 (range top-x (+ top-x size)))))
                           res-and-shifted-slices-new
                           (for  [size (range 2 (inc max-size))
-                                   ;(inc (- height top-left-x))))
-                                   :let [top-x-to-packed-shift-slice ;List of pairs [top-x (pack-shift-slice ...)]
-                                                                       (for [top-x (range 0 (inc (- height size)))
-                                                                             :let [shift-slice (pack-shift-slice top-x size)]
-                                                                             :when (not (prev-shift-slices shift-slice))]
-                                                                         [top-x shift-slice])
-                                         top-left-y-range (range 0 (inc (- width size)))] ;excluding the last, since squares have size >=2
-                                 [top-left-x shift-slice] top-x-to-packed-shift-slice            ;(range 0 (inc (- height size)))#_TODO
-                                 ;:when (not (excluded-top-rows top-left-x))
-                                 top-left-y top-left-y-range
-                                 
-                                 :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
-                                       square (get-square shifts top-left-x top-left-y size)]
-                                 :when square]
-                            [square shift-slice])
-                          res-new (map first res-and-shifted-slices-new)
+                                 :let [top-x-to-packed-shift-slice ;List of pairs [top-x (pack-shift-slice ...)]
+                                       (for [top-x (range 0 (inc (- height size)))
+                                             :let [shift-slice (#_dbgf pack-shift-slice top-x size)]
+                                                   ;_ (if (prev-shift-slices shift-slice) (println "Skipping"))
+                                                   ;_ (println 'prev-shift-slices prev-shift-slices)
+                                             :when (not (prev-shift-slices shift-slice))]
+                                         [top-x shift-slice])
+                                       top-left-y-range (range 0 (inc (- width size)))] ;excluding the last, since squares have size >=2
+                                 [top-left-x shift-slice] top-x-to-packed-shift-slice]
+                            [(for [top-left-y top-left-y-range
+                                   :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
+                                         square (#_dbgf get-square shifts top-left-x top-left-y size)]
+                                   :when square]
+                               square)
+                             shift-slice])
+                          res-new (apply concat
+                                    (map first res-and-shifted-slices-new))
                           res-next (into res res-new)
                           shift-slices-new (map second res-and-shifted-slices-new)
                           shift-slices-next (into prev-shift-slices shift-slices-new)
@@ -745,7 +750,7 @@
           [3 7 6 8 1 4 5 2]
           [1 8 5 2 4]
           [8 1 2 4 5]]))
-(if false
+(if true
 ; indexes  0 1 2 3 4 5
   (latin [[3 1 2]
           [1 2 3 1 3 4]
