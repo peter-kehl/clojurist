@@ -653,6 +653,20 @@
                                result)
                            result
                            nil)))
+          ; a list of sequences, each cell containing a shift (0 or higher) of its respective vector (row) in vecs[]. 
+          groups-of-shifts (letfn [(sub-shifts-since-level [level]
+                                     (let [results-below (if (< level max-x) #_alternativ-to-memoize
+                                                           (sub-shifts-since-level (inc level))
+                                                           :unused)]
+                                       (apply concat
+                                         (for [shift (range 0 (inc (- width (count (vecs level)))))]
+                                           (if (= level max-x)
+                                             [[shift]]
+                                             (map
+                                               #(cons shift %) ;alternative: (partial cons shift)
+                                               results-below))))))]
+                             (sub-shifts-since-level 0))
+          ;_ (clojure.pprint/pprint groups-of-shifts)
           
           ;return a set of items, if slices (rows) form a horizontally-latin square; false otherwise
           horizontal-latin? (fn [slices]
@@ -672,22 +686,6 @@
                           (let [columns (for [col-index (range 0 (count square))] ;rotate columns into rows
                                           (map #(nth % col-index) square))]
                             (= (horizontal-latin? columns) horizontal)))))
-          
-          ; a list of sequences, each cell containing a shift (0 or higher) of its respective vector (row) in vecs[]. 
-          groups-of-shifts (letfn [(sub-shifts-since-level [level]
-                                     (let [results-below (if (< level max-x) #_alternativ-to-memoize
-                                                           (sub-shifts-since-level (inc level))
-                                                           :unused)]
-                                       (apply concat
-                                         (for [shift (range 0 (inc (- width (count (vecs level)))))]
-                                           (if (= level max-x)
-                                             [[shift]]
-                                             (map
-                                               #(cons shift %) ;alternative: (partial cons shift)
-                                               results-below))))))]
-                             (sub-shifts-since-level 0))
-          ;_ (clojure.pprint/pprint groups-of-shifts)
-          
           ;Get all possible squares. High-level optimisation: Keep a track of *slices* (i.e. consecutive parts) of length 2 or more of
           ;already processed shifts. Skip collecting squares of the size & location that fits into
           ;those already processed shifts. (This optimisation is partial, as two different shifts may shift
@@ -710,8 +708,8 @@
                                  :let [top-x-to-packed-shift-slice ;List of pairs [top-x (pack-shift-slice ...)]
                                        (for [top-x (range 0 (inc (- height size)))
                                              :let [shift-slice (#_dbgf pack-shift-slice top-x size)]
-                                                   ;_ (if (prev-shift-slices shift-slice) (println "Skipping"))
-                                                   ;_ (println 'prev-shift-slices prev-shift-slices)
+                                             ;_ (if (prev-shift-slices shift-slice) (println "Skipping"))
+                                             ;_ (println 'prev-shift-slices prev-shift-slices)
                                              :when (not (prev-shift-slices shift-slice))]
                                          [top-x shift-slice])
                                        top-left-y-range (range 0 (inc (- width size)))] ;excluding the last, since squares have size >=2
@@ -719,7 +717,8 @@
                             [(for [top-left-y top-left-y-range
                                    :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
                                          square (#_dbgf get-square shifts top-left-x top-left-y size)]
-                                   :when square]
+                                   :when square] ;TODO 0. start with the rightmost column of the square (item set reused for -> #2) 1. add only if latin 2. then check +size-1 column to the right. Perform the whole check only if both columns have same item set.
+                               ;                    \-> pass the reference column and its position, or the index set of the rest of the columns, as a parameter to latin?
                                square)
                              shift-slice])
                           res-new (apply concat
@@ -750,7 +749,7 @@
           [3 7 6 8 1 4 5 2]
           [1 8 5 2 4]
           [8 1 2 4 5]]))
-(if true
+(if false
 ; indexes  0 1 2 3 4 5
   (latin [[3 1 2]
           [1 2 3 1 3 4]
