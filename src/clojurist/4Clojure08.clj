@@ -30,16 +30,17 @@
           ;_ (println "axis-ranges" axis-ranges)
           get-square (fn [top-left-x top-left-y size view] ;vec of vecs (with no nil), or nil if no such square (e.g. if a cell would be nil otherwise)
                        ;{:post [(or (nil? %) (square? %))]}
-                       (let [axis-range (axis-ranges size)
+                       (let [axis-rng (axis-ranges size)
                              top-right-y+1 (+ top-left-y size)
-                             result (vec (for    [x-within-square axis-range]
+                             result (vec (for    [x-within-square axis-rng]
                                            (subvec (view (+ x-within-square top-left-x)) top-left-y top-right-y+1)))]
                          ;(dbg-println "potential result:") (pprint-one-square result)
-                         (if (every?
-                               (fn [row] (every? #(not (nil? %)) row))
-                               result)
-                           result
-                           nil)))
+                         (if (seq (for [x axis-rng
+                                        y axis-rng
+                                        :when (nil? ((result x) y))]
+                                    :contains-nil))
+                           nil 
+                           result)))
           ; a list of sequences, each cell containing a shift (0 or higher) of its respective vector (row) in vecs-orig[]. 
           groups-of-shifts (letfn [(sub-shifts-since-level [level]
                                      (let [results-below (if (< level max-x) #_alternativ-to-memoize
@@ -69,10 +70,10 @@
           latin? (fn [square]
                    ;{:pre [(square? square)]}
                    (let [horizontal (horizontal-latin? square)]
-                     (and horizontal
-                          (let [columns (for [col-index (axis-ranges (count square))] ;rotate columns into rows
-                                          (map #(% col-index) square))]
-                            (= (horizontal-latin? columns) horizontal)))))
+                      (and horizontal
+                           (let [columns (for [col-index (axis-ranges (count square))] ;rotate columns into rows
+                                           (map #(% col-index) square))]
+                             (= (horizontal-latin? columns) horizontal)))))
           x-range (axis-ranges height)
           y-range (axis-ranges width)
           ;Get all possible squares. High-level optimisation: Keep a track of *slices* (i.e. consecutive parts) of length 2 or more of
@@ -112,17 +113,14 @@
                                                               (map
                                                                 (fn [x] [x (nth shifts x)])
                                                                 (range top-x (+ top-x size)))))
-                          res-and-shifted-slices-new
+                          res-in-groups-and-shifted-slices-new
                           (for  [size (range 2 (inc max-size))
-                                 :let [top-x-to-packed-shift-slice ;List of pairs [top-x (pack-shift-slice ...)]
-                                       (for [top-x (axis-ranges (inc (- height size)))
-                                             :let [shift-slice (#_dbgf pack-shift-slice top-x size)]
-                                             ;_ (if (prev-shift-slices shift-slice) (println "Skipping"))
-                                             ;_ (println 'prev-shift-slices prev-shift-slices)
-                                             :when (not (prev-shift-slices shift-slice))]
-                                         [top-x shift-slice])
-                                       top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
-                                 [top-left-x shift-slice] top-x-to-packed-shift-slice]
+                                 :let [top-left-y-range (axis-ranges (inc (- width size)))]
+                                        ;excluding the last, since squares have size >=2
+                                 top-left-x (axis-ranges (inc (- height size)))
+                                 :let [shift-slice (#_dbgf pack-shift-slice top-left-x size)]
+                                 :when (not (prev-shift-slices shift-slice))]
+                            ;[top-left-x shift-slice] top-x-to-packed-shift-slice]
                             [(for [top-left-y top-left-y-range
                                    :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
                                          square (#_dbgf get-square top-left-x top-left-y size view)]
@@ -131,9 +129,9 @@
                                square)
                              shift-slice])
                           res-new (apply concat
-                                    (map first res-and-shifted-slices-new))
+                                    (map first res-in-groups-and-shifted-slices-new))
                           res-next (into res res-new)
-                          shift-slices-new (map second res-and-shifted-slices-new)
+                          shift-slices-new (map second res-in-groups-and-shifted-slices-new)
                           shift-slices-next (into prev-shift-slices shift-slices-new)
                           shifts-leftover-next (next shifts-leftover)]
                       (if shifts-leftover-next
@@ -144,8 +142,7 @@
                           res-next)
                         res-next)))
           ;_ (pprint-squares squares)
-          latin-squares (distinct
-                          (filter latin? squares))]
+          latin-squares (filter latin? squares)]
       
       (into {}
         (map
