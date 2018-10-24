@@ -4,6 +4,7 @@
 (def latin
   (fn [vecs-orig]
     (let [MIN-OPTIMISED-SIZE 2 ;Increasing to 3 slowed down the last (biggest) test at http://www.4clojure.com/problem/152 from 206ms to 300ms! 
+          MIN-VEC-OPS-SIZE 4
           height (count vecs-orig)
           max-x (dec height)
           width (apply max (map count vecs-orig))
@@ -25,12 +26,11 @@
           ;_ (println "axis-ranges" axis-ranges)
           get-square (fn [top-left-x top-left-y shifts size] ;vec of vecs (with no nil), or nil if no such square (e.g. if a cell would be nil otherwise)
                        ;{:post [(or (nil? %) (square? %))]}
-                       (let [axis-rng (axis-ranges size)
-                             ;top-right-y+1 (+ top-left-y size)
-                             result-list (for [x-orig (range top-left-x (+ top-left-x size)) ;x-within-square axis-rng]
-                                               :let [shift (nth shifts x-orig)
-                                                     row-orig (vecs-orig x-orig)
-                                                     top-left-y-orig (- top-left-y shift)]
+                       (let [;use-vector-ops (<= MIN-VEC-OPS-SIZE size)
+                             ; *-orig coordinates are within the whole matrix vecs-orig AND after applying any shifts
+                             result-list (for [x-orig (range top-left-x (+ top-left-x size))
+                                               :let [row-orig (vecs-orig x-orig)
+                                                     top-left-y-orig (- top-left-y #_shift==> (nth shifts x-orig))]
                                                :while (<= 0 top-left-y-orig)
                                                :let [top-left-y-orig+size (+ top-left-y-orig size)]
                                                :while (<= top-left-y-orig+size (count row-orig))]
