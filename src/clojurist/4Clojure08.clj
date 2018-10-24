@@ -8,14 +8,8 @@
           width (apply max (map count vecs-orig))
           max-y (dec width)
           max-size (min width height)
-          
-          ; (view ...) used to throw on wrong index(es) - so that get-square can catch it easily. But 4clojure refuses (catch...)
-          view (fn [shifts x y] ;nil if not present
-                 (get (vecs-orig x) (- y (nth shifts x))))
-          
-          square? (fn [square]
-                    (let [size (count square)]
-                      (every? (fn [row] (= (count row) size)) square)))
+          ; Can't throw on wrong index(es) - so that upper function can catch it easily. Why? This 4clojure problem refuses (catch...)
+
           pprint-one-square (fn [square]
                               (count (map #(println %) square))) ;(count ...) because (map...) is lazy
           pprint-squares (fn [squares]
@@ -70,10 +64,10 @@
           latin? (fn [square]
                    ;{:pre [(square? square)]}
                    (let [horizontal (horizontal-latin? square)]
-                      (and horizontal
-                           (let [columns (for [col-index (axis-ranges (count square))] ;rotate columns into rows
-                                           (map #(% col-index) square))]
-                             (= (horizontal-latin? columns) horizontal)))))
+                     (and horizontal
+                          (let [columns (for [col-index (axis-ranges (count square))] ;rotate columns into rows
+                                          (map #(% col-index) square))]
+                            (= (horizontal-latin? columns) horizontal)))))
           x-range (axis-ranges height)
           y-range (axis-ranges width)
           ;Get all possible squares. High-level optimisation: Keep a track of *slices* (i.e. consecutive parts) of length 2 or more of
@@ -95,7 +89,7 @@
                                                              old (get-in prev-shifted-rows (list x shift))]
                                                        :when (nil? old)]
                                                    (let [row-orig (vecs-orig x)
-                                                         row (vec (concat
+                                                         row (vec (concat ;need a vector, so get-square can use (subvec..)
                                                                     (repeat shift nil)
                                                                     row-orig
                                                                     (repeat (- width shift (count row-orig)) nil)))] ;repeat accepts negative n => empty seq ()
@@ -115,12 +109,11 @@
                                                                 (range top-x (+ top-x size)))))
                           res-in-groups-and-shifted-slices-new
                           (for  [size (range 2 (inc max-size))
-                                 :let [top-left-y-range (axis-ranges (inc (- width size)))]
-                                        ;excluding the last, since squares have size >=2
+                                 :let [top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
                                  top-left-x (axis-ranges (inc (- height size)))
                                  :let [shift-slice (#_dbgf pack-shift-slice top-left-x size)]
                                  :when (not (prev-shift-slices shift-slice))]
-                            ;[top-left-x shift-slice] top-x-to-packed-shift-slice]
+                            
                             [(for [top-left-y top-left-y-range
                                    :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
                                          square (#_dbgf get-square top-left-x top-left-y size view)]
