@@ -82,26 +82,9 @@
           ;to cover all combinations of two or more consecutive rows.
           ;Because we're caching/skipping based on shifts, each (loop) iteration processes one shift completely.
           squares (loop [prev-shift-slices #{}
-                         prev-shifted-rows {} ;2-dimensional array {row-index-x {shift-of-that-row row-of-cells-with-nil-for-empty ..} ..}
                          shifts-leftover groups-of-shifts
                          res #{}]
                     (let [shifts (first shifts-leftover)
-                          ; intermediate structure, seq. of seqs, where first cell is a seq. with 2-D indexes like for prev-shifted-rows, and second cell is a value (shifted row). This structure is easy to (apply assoc-in result-map ...)
-                          shifted-rows-new-struc (and false (for [x x-range
-                                                                  :let [shift (nth shifts x)
-                                                                        old (get-in prev-shifted-rows (list x shift))]
-                                                                  :when (nil? old)]
-                                                              (let [row-orig (vecs-orig x)
-                                                                    row (vec (concat ;need a vector, so get-square can use (subvec..)
-                                                                               (repeat shift nil)
-                                                                               row-orig
-                                                                               (repeat (- width shift (count row-orig)) nil)))] ;repeat accepts negative n => empty seq ()
-                                                                (list (list x shift) row))))
-                          shifted-rows-next (and false (reduce
-                                                         (fn [res x-shift-row]
-                                                           (apply assoc-in res x-shift-row))
-                                                         prev-shifted-rows
-                                                         shifted-rows-new-struc)) 
                           ;specific per size, because latin squares of different size (generally) don't share parts
                           pack-shift-slice (fn [top-x size] (into {}
                                                               (map
@@ -130,7 +113,6 @@
                       (if shifts-leftover-next
                         (recur
                           shift-slices-next
-                          shifted-rows-next
                           shifts-leftover-next
                           res-next)
                         res-next)))

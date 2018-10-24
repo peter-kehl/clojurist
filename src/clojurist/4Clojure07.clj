@@ -401,6 +401,7 @@
 ;----
 ; start with ((((...)))), then move the rightmost \( step by step to the right (as far as possible)
 ;            (()...())()
+; NOT ALL RESULTS!
 (def parens
   (fn [n]
     (if (zero? n)
