@@ -3,7 +3,8 @@
 ;http://www.4clojure.com/problem/152 LAtin Squares
 (def latin
   (fn [vecs-orig]
-    (let [height (count vecs-orig)
+    (let [MIN-OPTIMISED-SIZE 2 ;Increasing to 3 slowed down the last (biggest) test at http://www.4clojure.com/problem/152 from 206ms to 300ms! 
+          height (count vecs-orig)
           max-x (dec height)
           width (apply max (map count vecs-orig))
           max-y (dec width)
@@ -94,9 +95,9 @@
                           (for  [size (range 2 (inc max-size))
                                  :let [top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
                                  top-left-x (axis-ranges (inc (- height size)))
-                                 :let [shift-slice (#_dbgf pack-shift-slice top-left-x size)]
-                                 :when (not (contains? prev-shift-slices shift-slice))]
-                            
+                                 :let [shift-slice (if (<= MIN-OPTIMISED-SIZE size) (pack-shift-slice top-left-x size))] ;Optimisation only for squares of size >=MIN-OPTIMISED-SIZE
+                                 :when (or (< size MIN-OPTIMISED-SIZE)
+                                           (not (contains? prev-shift-slices shift-slice)))]
                             [(for [top-left-y top-left-y-range
                                    :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
                                          square (#_dbgf get-square top-left-x top-left-y shifts size)]
@@ -107,7 +108,7 @@
                           res-new (apply concat
                                     (map first res-in-groups-and-shifted-slices-new))
                           res-next (into res res-new)
-                          shift-slices-new (map second res-in-groups-and-shifted-slices-new)
+                          shift-slices-new (map second res-in-groups-and-shifted-slices-new) ;for size<MIN-OPTIMISED-SIZE this is (list nil) - still OK
                           shift-slices-next (into prev-shift-slices shift-slices-new)
                           shifts-leftover-next (next shifts-leftover)]
                       (if shifts-leftover-next
