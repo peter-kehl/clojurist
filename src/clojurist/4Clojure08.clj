@@ -35,12 +35,12 @@
                              result (vec (for    [x-within-square axis-rng]
                                            (subvec (view (+ x-within-square top-left-x)) top-left-y top-right-y+1)))]
                          ;(dbg-println "potential result:") (pprint-one-square result)
-                         (if (seq (for [x axis-rng
-                                        y axis-rng
-                                        :when (nil? ((result x) y))]
-                                    :contains-nil))
-                           nil 
-                           result)))
+                         (if (empty? (for [x axis-rng
+                                           y axis-rng
+                                           :when (nil? ((result x) y))]
+                                       :contains-nil))
+                           result 
+                           nil)))
           ; a list of sequences, each cell containing a shift (0 or higher) of its respective vector (row) in vecs-orig[]. 
           groups-of-shifts (letfn [(sub-shifts-since-level [level]
                                      (let [results-below (if (< level max-x) #_alternativ-to-memoize
