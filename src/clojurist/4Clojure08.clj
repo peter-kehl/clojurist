@@ -24,8 +24,8 @@
                                     squares))
                            (println)) ;(count ...) because (map...) is lazy
           
-          axis-ranges (vec (map ;axis-ranges[] is vector: size => (range 0 size).
-                             #(range 0 %)
+          axis-ranges (vec (map ;axis-ranges[] is a vector: size => (range 0 size).
+                             #(range 0 %) ;making it a vector will slow the usages down!
                              (range 0 (inc (max width height))))) ;even though we use size >=2, this must start at 0 so it's indexable
           ;_ (println "axis-ranges" axis-ranges)
           get-square (fn [top-left-x top-left-y size view] ;vec of vecs (with no nil), or nil if no such square (e.g. if a cell would be nil otherwise)
@@ -85,30 +85,30 @@
           ;to cover all combinations of two or more consecutive rows.
           ;Because we're caching/skipping based on shifts, each (loop) iteration processes one shift completely.
           squares (loop [prev-shift-slices #{}
-                         prev-shifted-rows {} ;2-dimensional array {row-index-x {shift-of-that-row row-of-cells ..} ..}
+                         prev-shifted-rows {} ;2-dimensional array {row-index-x {shift-of-that-row row-of-cells-with-nil-for-empty ..} ..}
                          shifts-leftover groups-of-shifts
                          res #{}]
                     (let [shifts (first shifts-leftover)
-                          ; seq. of seqs, where first cell is a seq. with 2-D indexes like for prev-shifted-rows, and second cell is a value (shifted row). This structure is easy to (apply assoc-in result-map ...)
-                          shifted-rows-new (for [x x-range
-                                                 :let [shift (nth shifts x)
-                                                       old (get-in prev-shifted-rows (list x shift))]
-                                                 :when (nil? old)]
-                                             (let [row-orig (vecs-orig x)
-                                                   row (vec (concat
-                                                              (repeat shift nil)
-                                                              row-orig
-                                                              (repeat (- width shift (count row-orig)) nil)))] ;repeat accepts negative n => empty seq ()
-                                               (list (list x shift) row)))
+                          ; intermediate structure, seq. of seqs, where first cell is a seq. with 2-D indexes like for prev-shifted-rows, and second cell is a value (shifted row). This structure is easy to (apply assoc-in result-map ...)
+                          shifted-rows-new-struc (for [x x-range
+                                                       :let [shift (nth shifts x)
+                                                             old (get-in prev-shifted-rows (list x shift))]
+                                                       :when (nil? old)]
+                                                   (let [row-orig (vecs-orig x)
+                                                         row (vec (concat
+                                                                    (repeat shift nil)
+                                                                    row-orig
+                                                                    (repeat (- width shift (count row-orig)) nil)))] ;repeat accepts negative n => empty seq ()
+                                                     (list (list x shift) row)))
                           shifted-rows-next (reduce
                                               (fn [res x-shift-row]
                                                 (apply assoc-in res x-shift-row))
                                               prev-shifted-rows
-                                              shifted-rows-new) 
+                                              shifted-rows-new-struc) 
                           ;a 2-dimensional height X width vector of vectors, a representation of vecs-orig[] with applied shifts[]
                           view (vec (for [x x-range]
-                                      (get-in shifted-rows-next (list x (nth shifts x)))))
-                          ;specific per size, because squares of different size (generally) don't share parts
+                                      ((shifted-rows-next x) (nth shifts x))))
+                          ;specific per size, because latin squares of different size (generally) don't share parts
                           pack-shift-slice (fn [top-x size] (into {}
                                                               (map
                                                                 (fn [x] [x (nth shifts x)])
@@ -142,8 +142,7 @@
                           res-next)
                         res-next)))
           ;_ (pprint-squares squares)
-          latin-squares (filter latin? squares)]
-      
+          latin-squares (filter latin? squares)] ;filter latin? takes only 10% time
       (into {}
         (map
           (fn [[size sqs]]
