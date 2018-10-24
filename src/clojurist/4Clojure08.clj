@@ -112,7 +112,7 @@
                                  :let [top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
                                  top-left-x (axis-ranges (inc (- height size)))
                                  :let [shift-slice (#_dbgf pack-shift-slice top-left-x size)]
-                                 :when (not (prev-shift-slices shift-slice))]
+                                 :when (not (contains? prev-shift-slices shift-slice))]
                             
                             [(for [top-left-y top-left-y-range
                                    :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
