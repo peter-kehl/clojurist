@@ -3,7 +3,7 @@
 ;http://www.4clojure.com/problem/152 LAtin Squares
 (def latin
   (fn [vecs-orig]
-    (let [MIN-OPTIMISED-SIZE 2 ;Increasing to 3 slowed down the last (biggest) test at http://www.4clojure.com/problem/152 from 206ms to 300ms! 
+    (let [;MIN-OPTIMISED-SIZE 2 ;Increasing to 3 slowed down the last (biggest) test at http://www.4clojure.com/problem/152 from 206ms to 300ms! 
           ;MIN-VEC-OPS-SIZE 4
           height (count vecs-orig)
           max-x (dec height)
@@ -99,15 +99,16 @@
                                                               (list top-x (shifts top-x) (shifts (inc top-x))))
                                                             ;result is specific per size, because latin squares of different size (usually) don't share parts
                                                             (fn [top-x] 
-                                                              (cons top-x
-                                                                (subvec shifts top-x (+ top-x size))))))
+                                                              (conj
+                                                                (subvec shifts top-x (+ top-x size))
+                                                                top-x))))
                                                                   
                                        top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
                                  top-left-x (axis-ranges (inc (- height size)))
-                                 :let [shift-slice (if (and (<= MIN-OPTIMISED-SIZE size)
-                                                            (<= size MAX-OPTIMISED-SIZE))
+                                 :let [shift-slice (if ;and (<= MIN-OPTIMISED-SIZE size
+                                                     (<= size MAX-OPTIMISED-SIZE)
                                                      (pack-shift-slice top-left-x))] ;Optimisation only for squares of size >=MIN-OPTIMISED-SIZE
-                                 :when (or (< size MIN-OPTIMISED-SIZE)
+                                 :when (or ;(< size MIN-OPTIMISED-SIZE)
                                            (< MAX-OPTIMISED-SIZE size)
                                            (not (contains? prev-shift-slices shift-slice)))]
                             [(for [top-left-y top-left-y-range
