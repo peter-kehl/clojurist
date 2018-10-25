@@ -120,7 +120,8 @@
                           res-new (apply concat
                                     (map first res-in-groups-and-shifted-slices-new))
                           res-next (into res res-new)
-                          shift-slices-new (map second res-in-groups-and-shifted-slices-new) ;for size<MIN-OPTIMISED-SIZE or MAX-OPTIMISED-SIZE<size this is (list nil) - still OK
+                          shift-slices-new (filter identity #_exclude-nil-to-speedup-the-below-into
+                                             (map second res-in-groups-and-shifted-slices-new)) ;for size<MIN-OPTIMISED-SIZE or MAX-OPTIMISED-SIZE<size this is (list nil) - still OK
                           shift-slices-next (into prev-shift-slices shift-slices-new)
                           shifts-leftover-next (next shifts-leftover)]
                       (if shifts-leftover-next
