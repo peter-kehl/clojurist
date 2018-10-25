@@ -4,14 +4,16 @@
 (def latin
   (fn [vecs-orig]
     (let [MIN-OPTIMISED-SIZE 2 ;Increasing to 3 slowed down the last (biggest) test at http://www.4clojure.com/problem/152 from 206ms to 300ms! 
-          MIN-VEC-OPS-SIZE 4
+          ;MIN-VEC-OPS-SIZE 4
           height (count vecs-orig)
           max-x (dec height)
           width (apply max (map count vecs-orig))
           max-y (dec width)
           max-size (min width height)
+          MAX-OPTIMISED-SIZE (- max-size 1);Definitely don't optimise squares with size equal to max-size, because such squares fit exactly in one
+          ;(or even both) dimensions of vecs-orig[][], hence even without optimisation they're processed only once.
           ; Can't throw on wrong index(es) - so that upper function can catch it easily. Why? This 4clojure problem refuses (catch...)
-
+          
           pprint-one-square (fn [square]
                               (count (map #(println %) square))) ;(count ...) because (map...) is lazy
           pprint-squares (fn [squares]
@@ -95,8 +97,11 @@
                           (for  [size (range 2 (inc max-size))
                                  :let [top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
                                  top-left-x (axis-ranges (inc (- height size)))
-                                 :let [shift-slice (if (<= MIN-OPTIMISED-SIZE size) (pack-shift-slice top-left-x size))] ;Optimisation only for squares of size >=MIN-OPTIMISED-SIZE
+                                 :let [shift-slice (if (and (<= MIN-OPTIMISED-SIZE size)
+                                                            (<= size MAX-OPTIMISED-SIZE))
+                                                       (pack-shift-slice top-left-x size))] ;Optimisation only for squares of size >=MIN-OPTIMISED-SIZE
                                  :when (or (< size MIN-OPTIMISED-SIZE)
+                                           (< MAX-OPTIMISED-SIZE size)
                                            (not (contains? prev-shift-slices shift-slice)))]
                             [(for [top-left-y top-left-y-range
                                    :let [;_ (println "shifts" shifts "top [" top-left-x top-left-y "size" size)
@@ -108,7 +113,7 @@
                           res-new (apply concat
                                     (map first res-in-groups-and-shifted-slices-new))
                           res-next (into res res-new)
-                          shift-slices-new (map second res-in-groups-and-shifted-slices-new) ;for size<MIN-OPTIMISED-SIZE this is (list nil) - still OK
+                          shift-slices-new (map second res-in-groups-and-shifted-slices-new) ;for size<MIN-OPTIMISED-SIZE or MAX-OPTIMISED-SIZE<size this is (list nil) - still OK
                           shift-slices-next (into prev-shift-slices shift-slices-new)
                           shifts-leftover-next (next shifts-leftover)]
                       (if shifts-leftover-next
