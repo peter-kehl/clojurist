@@ -32,7 +32,7 @@
                              ; *-orig coordinates are within the whole matrix vecs-orig AND after applying any shifts
                              result-list (for [x-orig (range top-left-x (+ top-left-x size))
                                                :let [row-orig (vecs-orig x-orig)
-                                                     top-left-y-orig (- top-left-y #_shift==> (nth shifts x-orig))]
+                                                     top-left-y-orig (- top-left-y #_shift==> (shifts x-orig))]
                                                :while (<= 0 top-left-y-orig)
                                                :let [top-left-y-orig+size (+ top-left-y-orig size)]
                                                :while (<= top-left-y-orig+size (count row-orig))]
@@ -41,7 +41,8 @@
                          (if (= (count result-list) size)
                            (vec result-list) 
                            nil)))
-          ; a list of sequences, each cell containing a shift (0 or higher) of its respective vector (row) in vecs-orig[]. 
+          ; a list of vectors, each cell containing a shift (0 or higher) of its respective vector (row) in vecs-orig[].
+          ; They are vectors rather than seq, so that pack-shift-slice can use (subvec ...) on them.
           groups-of-shifts (letfn [(sub-shifts-since-level [level]
                                      (let [results-below (if (< level max-x) #_alternativ-to-memoize
                                                            (sub-shifts-since-level (inc level))
@@ -51,7 +52,7 @@
                                            (if (= level max-x)
                                              [[shift]]
                                              (map
-                                               #(cons shift %) ;alternative: (partial cons shift)
+                                               #(conj % shift)
                                                results-below))))))]
                              (sub-shifts-since-level 0))
           ;_ (clojure.pprint/pprint groups-of-shifts)
@@ -95,13 +96,12 @@
                                  :let [pack-shift-slice (if (<= size MAX-OPTIMISED-SIZE)
                                                           (if (= size 2)
                                                             (fn [top-x] ;optimised version
-                                                              (list top-x (nth shifts top-x) (nth shifts (inc top-x))))
+                                                              (list top-x (shifts top-x) (shifts (inc top-x))))
                                                             ;result is specific per size, because latin squares of different size (usually) don't share parts
                                                             (fn [top-x] 
                                                               (cons top-x
-                                                                (map
-                                                                  (fn [x] (nth shifts x))
-                                                                  (range top-x (+ top-x size)))))))
+                                                                (subvec shifts top-x (+ top-x size))))))
+                                                                  
                                        top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
                                  top-left-x (axis-ranges (inc (- height size)))
                                  :let [shift-slice (if (and (<= MIN-OPTIMISED-SIZE size)
