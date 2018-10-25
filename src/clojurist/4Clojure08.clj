@@ -29,20 +29,41 @@
                              #(range 0 %) ;making it a vector will slow the usages down!
                              (range 0 (inc (max width height))))) ;even though we use size >=2, this must start at 0 so it's indexable
           ;_ (println "axis-ranges" axis-ranges)
+          
+          #_square? #_(fn [sq]
+                       (let [size (count sq)]
+                         (every? #(= (count %) size) sq)))
+          #_get-square-with-for #_( fn[top-left-x top-left-y shifts size]
+                                   (let [; *-orig coordinates are within the whole matrix vecs-orig AND after applying any shifts
+                                         #_TODO-reduce-instead-of-for
+                                         result-list (for [x-orig (range top-left-x (+ top-left-x size))
+                                                           :let [row-orig (vecs-orig x-orig)
+                                                                 top-left-y-orig (- top-left-y #_shift==> (shifts x-orig))]
+                                                           :while (<= 0 top-left-y-orig)
+                                                           :let [top-left-y-orig+size (+ top-left-y-orig size)]
+                                                           :while (<= top-left-y-orig+size (count row-orig))]
+                                                       (subvec row-orig top-left-y-orig top-left-y-orig+size))]
+                                     ;(dbg-println "potential result:") (pprint-one-square result)
+                                     (if (= (count result-list) size)
+                                       (vec result-list) 
+                                       nil)))
+          ;Following saved around 3% time compared to using (for ...) as above.
           get-square (fn [top-left-x top-left-y shifts size] ;vec of vecs (with no nil), or nil if no such square (e.g. if a cell would be nil otherwise)
-                       ;{:post [(or (nil? %) (square? %))]}
-                       (let [; *-orig coordinates are within the whole matrix vecs-orig AND after applying any shifts
-                             result-list (for [x-orig (range top-left-x (+ top-left-x size))
-                                               :let [row-orig (vecs-orig x-orig)
-                                                     top-left-y-orig (- top-left-y #_shift==> (shifts x-orig))]
-                                               :while (<= 0 top-left-y-orig)
-                                               :let [top-left-y-orig+size (+ top-left-y-orig size)]
-                                               :while (<= top-left-y-orig+size (count row-orig))]
-                                           (subvec row-orig top-left-y-orig top-left-y-orig+size))]
-                         ;(dbg-println "potential result:") (pprint-one-square result)
-                         (if (= (count result-list) size)
-                           (vec result-list) 
-                           nil)))
+                       #_{:pre [(number? top-left-x) (number? top-left-y) (vector? shifts) (number? size)]
+                          :post [(or (nil? %) (square? %))]}
+                       (reduce
+                         (fn [res x-orig]
+                           (if res
+                             (let [row-orig (vecs-orig x-orig)
+                                   top-left-y-orig (- top-left-y #_shift==> (shifts x-orig))]
+                               (if (<= 0 top-left-y-orig)
+                                 (let [top-left-y-orig+size (+ top-left-y-orig size)]
+                                   (if (<= top-left-y-orig+size (count row-orig))
+                                     (conj res
+                                       (subvec row-orig top-left-y-orig top-left-y-orig+size))))))))
+                         []
+                         (range top-left-x (+ top-left-x size))))
+          
           ; A matrix representing all combinations of possible shifts (offsets) of all rows in vecs-orig[].
           ; A list of vectors, each cell containing an int shift (0 or higher) of its respective vector (row) in vecs-orig[].
           ; They are vectors rather than seq, so that pack-shift-slice can use (subvec ...) on them.
@@ -107,7 +128,7 @@
                                                               (conj
                                                                 (subvec shifts top-x (+ top-x size))
                                                                 top-x))))
-                                                                  
+                                       
                                        top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
                                  top-left-x (axis-ranges (inc (- height size)))
                                  :let [shift-slice (if ;and (<= MIN-OPTIMISED-SIZE size
