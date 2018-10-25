@@ -30,23 +30,22 @@
                              (range 0 (inc (max width height))))) ;even though we use size >=2, this must start at 0 so it's indexable
           ;_ (println "axis-ranges" axis-ranges)
           
-          #_square? #_(fn [sq]
-                       (let [size (count sq)]
-                         (every? #(= (count %) size) sq)))
-          #_get-square-with-for #_( fn[top-left-x top-left-y shifts size]
-                                   (let [; *-orig coordinates are within the whole matrix vecs-orig AND after applying any shifts
-                                         #_TODO-reduce-instead-of-for
-                                         result-list (for [x-orig (range top-left-x (+ top-left-x size))
-                                                           :let [row-orig (vecs-orig x-orig)
-                                                                 top-left-y-orig (- top-left-y #_shift==> (shifts x-orig))]
-                                                           :while (<= 0 top-left-y-orig)
-                                                           :let [top-left-y-orig+size (+ top-left-y-orig size)]
-                                                           :while (<= top-left-y-orig+size (count row-orig))]
-                                                       (subvec row-orig top-left-y-orig top-left-y-orig+size))]
-                                     ;(dbg-println "potential result:") (pprint-one-square result)
-                                     (if (= (count result-list) size)
-                                       (vec result-list) 
-                                       nil)))
+          square? (fn [sq]
+                    (let [size (count sq)]
+                      (every? #(= (count %) size) sq)))
+          #_get-square #_( fn[top-left-x top-left-y shifts size]
+                          (let [; *-orig coordinates are within the whole matrix vecs-orig AND after applying any shifts
+                                result-list (for [x-orig (range top-left-x (+ top-left-x size))
+                                                  :let [row-orig (vecs-orig x-orig)
+                                                        top-left-y-orig (- top-left-y #_shift==> (shifts x-orig))]
+                                                  :while (<= 0 top-left-y-orig)
+                                                  :let [top-left-y-orig+size (+ top-left-y-orig size)]
+                                                  :while (<= top-left-y-orig+size (count row-orig))]
+                                              (subvec row-orig top-left-y-orig top-left-y-orig+size))]
+                            ;(dbg-println "potential result:") (pprint-one-square result)
+                            (if (= (count result-list) size)
+                              (vec result-list) 
+                              nil)))
           ;Following saved around 3% time compared to using (for ...) as above.
           get-square (fn [top-left-x top-left-y shifts size] ;vec of vecs (with no nil), or nil if no such square (e.g. if a cell would be nil otherwise)
                        #_{:pre [(number? top-left-x) (number? top-left-y) (vector? shifts) (number? size)]

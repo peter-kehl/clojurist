@@ -346,12 +346,6 @@
                 "r y _ _"]))
 
 ;http://www.4clojure.com/problem/195 Parenthesis combinations
-; (((( ))))
-; n =>> n+1: ( around ), () before, with () in - at any index, after ()
-; NOT handling: with in n - but ( around a subset ) of n - at any possible index
-; - if the result is whole within (), then such a result can be accomplished by the above rule: ( around )
-; - otherwise the result is within 2+ () groups. Each was generated at lower level. It should have been
-;   embraced in another top level () pair as per above rules.
 (def parens
   (fn [target-n]
     (loop [prev #{""}
@@ -372,12 +366,44 @@
               (apply concat ;% faster than: reduce into #{}
                 (#_dbgf #_"map" map expand prev)))
             n))))))
-
-; Generate a set of seq first, then make them strings. That saves creation of string duplicates. But it was 3.5x slower than with strings!
-; n=12 => 2.1 sec with strings; 7.4sec with vectors!
-(def parens
+(def parens-orig
   (fn [target-n]
-    (loop [prev #{[]} ;always vectors -> easy (conj..)
+    ; (((( ))))
+    ; n =>> n+1: ( around ), () before, with () in - at any index, after ()
+    ; NOT handling: with in n - but ( around a subset ) of n - at any possible index
+    ; - if the result is whole within (), then such a result can be accomplished by the above rule: ( around )
+    ; - otherwise the result is within 2+ () groups. Each was generated at lower level. It should have been
+    ;   embraced in another top level () pair as per above rules.
+; Use bitwise operations. 1 stands for \( because there has to be \( on the left
+; (it would be more difficult with 0 on the left). Keep results as numbers - this makes a set #{} faster.
+; Only once we collect all numbers, transform to strings. Then replace 1 with \(, 0 with \).
+; (clojure.pprint/cl-format nil "2r~6,'0',B" (bit-shift-left 1N 63)) - bit operations not supported for BigInt. Hence max 63 => max 31 pairs of parens.
+; (.toString (.toBigInteger 10N) 2)
+    (loop [prev #{""}
+           prev-n 0]
+      (if (= target-n prev-n)
+        prev
+        (let [n (inc prev-n)
+              expand (fn [grp]
+                       (assert (= (* 2 prev-n) (count grp)))
+                       (into ;around the same speed as: apply conj (str...) (str...) (for....)
+                         (list (#_dbgf #_"str1" str \( grp \))
+                           (#_dbgf #_"str2" str grp "()"))
+                         (for [i (range 0 (count grp))]
+                           (#_dbgf #_"for-> str" str (subs grp 0 i) "()" (subs grp i)))))]
+          
+          (recur
+            (into #{} ;about the same speed as apply conj #{}...
+              (apply concat ;% faster than: reduce into #{}
+                (#_dbgf #_"map" map expand prev)))
+            n))))))
+
+; The first solution, rewritten to 
+; generate a set of seq first, then make them strings. That saves creation of string duplicates. But it was 3.5x slower than with strings!
+; n=12 => 2.1 sec with strings; 7.4sec with vectors!
+(def parens-fast
+  (fn [target-n]
+    (loop [prev #{2r10}
            prev-n 0]
       (if (= target-n prev-n)
         prev
@@ -402,7 +428,7 @@
 ; start with ((((...)))), then move the rightmost \( step by step to the right (as far as possible)
 ;            (()...())()
 ; NOT ALL RESULTS!
-(def parens
+(def parens2
   (fn [n]
     (if (zero? n)
       #{}
@@ -442,7 +468,7 @@
 ; -> then "jump over" the other rightmost opener(s)
 ; - treat a consecutive group of openers (( or ((( or ((((... as the same - it doesn't matter which of them you move to the right
 ; --- hence act only on 2nd/3rd/4th... openers ( that have a closer ) immediately right from them
-(def parens
+(def parens3
   (fn [n]
     (if (zero? n)
       #{}
@@ -486,7 +512,7 @@
 
 ;(parens 0)
 ;(parens 1)
-(parens 3)
+#_(parens 3)
 #_(count (parens 10))
 #_(time (= (nth (sort (parens 12)) 5000) "(((((()()()()()))))(()))")) ;2.1 sec with strings; 7.4sec with vectors!
 
