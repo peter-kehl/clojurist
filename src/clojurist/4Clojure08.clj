@@ -1,6 +1,9 @@
 (use 'clojure.set)
 
 ;http://www.4clojure.com/problem/152 LAtin Squares
+;Don't "optimise" (into #{} ...) by (apply hash-set ...)
+;(time (into #{} (range 0 10000))) ;"Elapsed time: 10.88184 msecs"
+;(time (apply hash-set (range 0 10000))) ;"Elapsed time: 12.570704 msecs"
 (def latin
   (fn [vecs-orig]
     (let [;MIN-OPTIMISED-SIZE 2 ;Increasing to 3 slowed down the last (biggest) test at http://www.4clojure.com/problem/152 from 206ms to 300ms! 
@@ -28,8 +31,7 @@
           ;_ (println "axis-ranges" axis-ranges)
           get-square (fn [top-left-x top-left-y shifts size] ;vec of vecs (with no nil), or nil if no such square (e.g. if a cell would be nil otherwise)
                        ;{:post [(or (nil? %) (square? %))]}
-                       (let [;use-vector-ops (<= MIN-VEC-OPS-SIZE size)
-                             ; *-orig coordinates are within the whole matrix vecs-orig AND after applying any shifts
+                       (let [; *-orig coordinates are within the whole matrix vecs-orig AND after applying any shifts
                              result-list (for [x-orig (range top-left-x (+ top-left-x size))
                                                :let [row-orig (vecs-orig x-orig)
                                                      top-left-y-orig (- top-left-y #_shift==> (shifts x-orig))]
