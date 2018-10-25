@@ -78,9 +78,11 @@
           y-range (axis-ranges width)
           ;Get all possible squares. High-level optimisation: Keep a track of *slices* (i.e. consecutive parts) of length 2 or more of
           ;already processed shifts. Skip collecting squares of the size & location that fits into
-          ;those already processed shifts. (This optimisation is partial, as two different shift groups may shift
+          ;those shifts that were processed already as a subset of previous shifts. (This optimisation is partial, as two different shift groups may shift
           ;two or more neighbouring rows by the same shift.)
-          ;prev-shift-slices set of maps #{ {index-of-row shift-for-that-row...}... } for two or more consecutive rows.
+          ;prev-shift-slices - a structure containing index-of-row & shift-for-that-row for all relevant shifted rows -
+          ;for two or more consecutive rows. (The actual structure doesn't matter, as far as it's comparable and storable in a hash-set.
+          ;The simpler the better.)
           ;If vecs-orig[] has more than two rows, then any shift generates multiple entries in prev-shift-slices #{},
           ;to cover all combinations of two or more consecutive rows.
           ;Because we're caching/skipping based on shifts, each (loop) iteration processes one shift completely.
@@ -89,17 +91,17 @@
                          res #{}]
                     (let [shifts (first shifts-leftover)
                           ;specific per size, because latin squares of different size (generally) don't share parts
-                          pack-shift-slice (fn [top-x size] (into {}
-                                                              (map
-                                                                (fn [x] [x (nth shifts x)])
-                                                                (range top-x (+ top-x size)))))
+                          pack-shift-slice (fn [top-x size] 
+                                             (map
+                                               (fn [x] (list x (nth shifts x)))
+                                               (range top-x (+ top-x size))))
                           res-in-groups-and-shifted-slices-new
                           (for  [size (range 2 (inc max-size))
                                  :let [top-left-y-range (axis-ranges (inc (- width size)))] ;excluding the last, since squares have size >=2
                                  top-left-x (axis-ranges (inc (- height size)))
                                  :let [shift-slice (if (and (<= MIN-OPTIMISED-SIZE size)
                                                             (<= size MAX-OPTIMISED-SIZE))
-                                                       (pack-shift-slice top-left-x size))] ;Optimisation only for squares of size >=MIN-OPTIMISED-SIZE
+                                                     (pack-shift-slice top-left-x size))] ;Optimisation only for squares of size >=MIN-OPTIMISED-SIZE
                                  :when (or (< size MIN-OPTIMISED-SIZE)
                                            (< MAX-OPTIMISED-SIZE size)
                                            (not (contains? prev-shift-slices shift-slice)))]
