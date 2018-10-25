@@ -41,14 +41,17 @@
                          (if (= (count result-list) size)
                            (vec result-list) 
                            nil)))
-          ; a list of vectors, each cell containing a shift (0 or higher) of its respective vector (row) in vecs-orig[].
+          ; A matrix representing all combinations of possible shifts (offsets) of all rows in vecs-orig[].
+          ; A list of vectors, each cell containing an int shift (0 or higher) of its respective vector (row) in vecs-orig[].
           ; They are vectors rather than seq, so that pack-shift-slice can use (subvec ...) on them.
+          ; "level" mens a row (x-axis) index.
           groups-of-shifts (letfn [(sub-shifts-since-level [level]
                                      (let [results-below (if (< level max-x) #_alternativ-to-memoize
                                                            (sub-shifts-since-level (inc level))
                                                            :unused)]
                                        (apply concat
-                                         (for [shift (axis-ranges (inc (- width (count (vecs-orig level)))))]
+                                         ; using axis-ranges to generate all possible shifts for this level (row):
+                                         (for [shift (axis-ranges (inc #_max-shift-for-this-level=>> (- width (count (vecs-orig level)))))]
                                            (if (= level max-x)
                                              [[shift]]
                                              (map
