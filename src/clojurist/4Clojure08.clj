@@ -67,19 +67,19 @@
           ; A list of vectors, each cell containing an int shift (0 or higher) of its respective vector (row) in vecs-orig[].
           ; They are vectors rather than seq, so that pack-shift-slice can use (subvec ...) on them.
           ; "level" mens a row (x-axis) index.
-          groups-of-shifts (letfn [(sub-shifts-since-level [level]
-                                     (let [results-below (if (< level max-x) #_alternativ-to-memoize
-                                                           (sub-shifts-since-level (inc level))
+          groups-of-shifts (letfn [(sub-shifts-down-to-level [level]
+                                     (let [results-above (if (< 0 level) #_alternativ-to-memoize
+                                                           (sub-shifts-down-to-level (dec level))
                                                            :unused)]
                                        (apply concat
                                          ; using axis-ranges to generate all possible shifts for this level (row):
                                          (for [shift (axis-ranges (inc #_max-shift-for-this-level=>> (- width (count (vecs-orig level)))))]
-                                           (if (= level max-x)
+                                           (if (= level 0)
                                              [[shift]]
                                              (map
                                                #(conj % shift)
-                                               results-below))))))]
-                             (sub-shifts-since-level 0))
+                                               results-above))))))]
+                             (sub-shifts-down-to-level max-x))
           ;_ (clojure.pprint/pprint groups-of-shifts)
           
           ;return a set of items, if slices (rows) form a horizontally-latin square; false otherwise
