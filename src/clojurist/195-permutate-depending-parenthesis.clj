@@ -54,43 +54,42 @@
                       \1 \()
                     \0 \)))
               ;using a function #({"1" "(" "0" ")"} %) with string/replace was slower: 430ms at target-n=9. 2x char replace: 308ms.
-              (let [expand (fn [grp]
-                             (let [grp-width (count-digits grp)]
-                               ;(assert (= (* 2 prev-n) grp-width) (str "prev-n: " prev-n ", grp: " grp " and in binary: " (clojure.pprint/cl-format nil "~,'0',B" grp)))
-                               (into
-                                 (list
-                                   ; \( grp \) == 1 grp 0
-                                   (bit-shift-left (bit-set grp grp-width) 1)
-                                   
-                                   ; grp \( \)
-                                   (bit-or
-                                     (bit-shift-left grp 2)
-                                     2r10))
-                                 
-                                 ;cut grp into two parts, starting from the right. Inject () in between.
-                                 (loop [i 0
-                                        ;left and left-new are "local," i.e. to contribute towards the result,
-                                        ;they need to be shifted to the left by i number of bits.
-                                        left (bit-shift-left grp 2) ;2 bits are an extra for injecting a () pair that will start at the rightmost
-                                        right 0
-                                        res ()]
-                                   ;(println "left:             " (clojure.pprint/cl-format nil "~,'0',B" left))
-                                   ;(println "right:            " (clojure.pprint/cl-format nil "~,'0',B" right))
-                                   ;(assert (zero? (bit-and left 2r11))) ;ensure 2 blanks on the right
-                                   (if (= i grp-width)
-                                     res
-                                     (let [left-new (bit-clear (bit-shift-right left 1) 1) ;shift, but keep the rightmost 2 bits blank
-                                           ;_ (println "left-new:         " (clojure.pprint/cl-format nil "~,'0',B" left-new))
-                                           left-new-and-pair (bit-or left-new 2r10)
-                                           ;_ (println "left-new-and-pair:" (clojure.pprint/cl-format nil "~,'0',B" left-new-and-pair))
-                                           right-new (if (bit-test left 2)
-                                                       (bit-set right i)
-                                                       right)
-                                           ;_ (println "right-new:        " (clojure.pprint/cl-format nil "~,'0',B" right-new))
-                                           grp-new (bit-or (bit-shift-left left-new-and-pair (inc i)) right-new)
-                                           ;_ (println "grp-new:          " (clojure.pprint/cl-format nil "~,'0',B" grp-new))
-                                           res-new (cons grp-new res)]
-                                       (recur (inc i) left-new right-new res-new)))))))]
+              (let [expand (fn [grp-width grp]
+                              ;(assert (= grp-width (count-digits grp)))
+                              (into
+                                (list
+                                  ; \( grp \) == 1 grp 0
+                                  (bit-shift-left (bit-set grp grp-width) 1)
+                                  
+                                  ; grp \( \)
+                                  (bit-or
+                                    (bit-shift-left grp 2)
+                                    2r10))
+                                
+                                ;cut grp into two parts, starting from the right. Inject () in between.
+                                (loop [i 0
+                                       ;left and left-new are "local," i.e. to contribute towards the result,
+                                       ;they need to be shifted to the left by i number of bits.
+                                       left (bit-shift-left grp 2) ;2 bits are an extra for injecting a () pair that will start at the rightmost
+                                       right 0
+                                       res ()]
+                                  ;(println "left:             " (clojure.pprint/cl-format nil "~,'0',B" left))
+                                  ;(println "right:            " (clojure.pprint/cl-format nil "~,'0',B" right))
+                                  ;(assert (zero? (bit-and left 2r11))) ;ensure 2 blanks on the right
+                                  (if (= i grp-width)
+                                    res
+                                    (let [left-new (bit-clear (bit-shift-right left 1) 1) ;shift, but keep the rightmost 2 bits blank
+                                          ;_ (println "left-new:         " (clojure.pprint/cl-format nil "~,'0',B" left-new))
+                                          left-new-and-pair (bit-or left-new 2r10)
+                                          ;_ (println "left-new-and-pair:" (clojure.pprint/cl-format nil "~,'0',B" left-new-and-pair))
+                                          right-new (if (bit-test left 2)
+                                                      (bit-set right i)
+                                                      right)
+                                          ;_ (println "right-new:        " (clojure.pprint/cl-format nil "~,'0',B" right-new))
+                                          grp-new (bit-or (bit-shift-left left-new-and-pair (inc i)) right-new)
+                                          ;_ (println "grp-new:          " (clojure.pprint/cl-format nil "~,'0',B" grp-new))
+                                          res-new (cons grp-new res)]
+                                      (recur (inc i) left-new right-new res-new))))))]
                 (loop [prev #{2r10}
                        prev-n 1]
                   (if (= target-n prev-n)
@@ -102,7 +101,7 @@
                     (recur
                       (into #{} ;about the same speed as apply conj #{}...
                         (apply concat ;% faster than: reduce into #{}
-                          (#_dbgf #_"map" map expand prev)))
+                          (#_dbgf #_"map" map (partial expand (* 2 prev-n)) prev)))
                       (inc prev-n)))))))))))
 
 ; The first solution, rewritten to generate a set of seq first, then make them strings.
