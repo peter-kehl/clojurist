@@ -1,6 +1,6 @@
 (require 'clojure.set)
 (require 'clojure.pprint)
-(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
+;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
 
 ;to reload this file in REPL, run:
 ;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/4Clojure05.clj")
@@ -55,7 +55,7 @@
                                    (#_dbg #_:first_pair-of-chars first pair-of-items)))]
                 #_TODO-for-end-of-prefix-onwards_change-each-index
                 #_TODO-merge-two-let
-                (dbg-println "Prev. candidate" prev-candidate "-> prefix" prefix)
+                ;(dbg-println "Prev. candidate" prev-candidate "-> prefix" prefix)
                 (println "Prev. candidate" prev-candidate "-> prefix" prefix)
                 (let [prev-count (count prev-candidate)
                       target-count (count target)
@@ -120,9 +120,9 @@
             ; ------- or: 2nd param only a string literal, not a keyword literal. If the user leaves it behind, it fails (can't be cast ot IFn). 
             ; 2. scope for lazy seq ->vvv
             (next-generation [previous-generation] ; Parameter and result are of type: coll of [candidate num-of-changes]
-              (dbgf :next-generation identity ;to set the upper scope for dbgf of lazy seq.
-                (for [pair (dbgf :next-generation :next-gen->validate-queue validate-queue previous-generation)
-                      next-pair (dbgf :next-generation :next-gen->next-candidates next-candidates pair)]
+              (#_dbgf #_:next-generation identity ;to set the upper scope for dbgf of lazy seq.
+                (for [pair (#_dbgf #_:next-generation :next-gen->validate-queue validate-queue previous-generation)
+                      next-pair (#_dbgf #_:next-generation :next-gen->next-candidates next-candidates pair)]
                   next-pair)))
             ;----if slow, transform somehow into a lazy seq.
             
@@ -144,7 +144,7 @@
            ; Once you find one result, remove all candidates that would take same number of steps or more.
            ; Repeat until all candidates reach (and obviously have same number of steps).
            
-           (dbgloop [priority (sorted-set-by compare-full [from 0])
+           (loop [priority (sorted-set-by compare-full [from 0])
                      backlog (sorted-set-by compare-full)
                      best-num-changes nil
                      ;past-candidate-pairs (sorted-set-by compare-full) ;;set of [candidate num-changes] that were/are being already handled (i.e. in priority, backlog or thrown away)
@@ -157,9 +157,9 @@
              (if (and (= (count priority) 1) (empty? backlog) #_not-nil best-num-changes)
                (second (first priority)) ;this was supposed to be the (one) best result, but (at least for "kitten" -> "sitting" it wasn't reached!
                (if (and (seq backlog) (< (/ (count priority) (count backlog) 0.50#_(tried 0.05, 0.30, 0.5)))) ;priority below a threshold, and backlog is non-empty => merge
-                 (dbgrecur (into priority backlog) (empty backlog) best-num-changes past-candidate-to-num) ;<<<
+                 (recur (into priority backlog) (empty backlog) best-num-changes past-candidate-to-num) ;<<<
                  (let [priority-moved-unfiltered (into (#_dbg #_"empty priority" empty priority)
-                                                   (dbgf :next-generation next-generation priority))
+                                                   (#_dbgf #_:next-generation next-generation priority))
                        _ (validate-queue priority-moved-unfiltered)
                        
                        ;Collect two structures: a map and a set, both based on priority-moved-unfiltered and past-candidate-to-num.
@@ -233,7 +233,7 @@
                                     best-num-changes)
                                   priority-moved-best-num-changes)
                        
-                       ;_ (dbg-pprint-last "priority-moved" priority-moved) _ (println)
+                       ;_ (#_dbg-pprint-last #_"priority-moved" priority-moved) _ (println)
                        
                        priority-moved-unreached (apply disj priority-moved priority-moved-results)
                        _ (validate-queue priority-moved-unreached)
@@ -260,7 +260,7 @@
                        (if (< @num-of-generations 350 #_250 #__400-too-much) ;limit number of generations - worthwhile for debugging
                          (do
                            (swap! num-of-generations inc)
-                           (dbgrecur priority-next backlog-next best-num past-candidate-to-num-next))
+                           (recur priority-next backlog-next best-num past-candidate-to-num-next))
                          :over-limit))))))))))))
 (if false
   (leven "kitten" "sitting"))
