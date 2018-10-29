@@ -68,21 +68,22 @@
                 (vec (reverse (for [i (range 0 n-pairs*2)]
                                 (bit-test numb i)))))
               (count-digits [numb digit]
-                {:pre [(number? digit)]}
+                {:pre [(number? numb) (or (= true digit) (= false digit) #_no-boolean?-in-CLJ-1_4)]}
                 (count (filter (partial = digit) (digits numb))))
               (generate [prev cumulated]
                 ;(assert (and (<= 0 openers) (<= 0 closers) (<= 0 diff) (= diff (- closers openers))))
                 ;(assert (or (zero? diff) (pos? closers)))
-                (assert (= (count-digits prev 1) (count-digits prev 0) n-pairs))
+                (println "prev: " (clojure.pprint/cl-format nil "~,'0',B" prev))
+                (assert (= (count-digits prev true) (count-digits prev true) n-pairs) (str "prev: " prev))
                 (let [[swap-point openers closers]
                       (loop [i 0 openers 0 closers 0]
                         (assert (= i (+ openers closers)))
                         (if (bit-test prev i) #_an-opener?
                           (if (< (inc openers) closers) #_swap-point?
                             (list i openers closers)
-                            (if (= n-pairs*2-1 i) #_leftmost-digit-then-we-are-finished?
-                             (list 0 0 0)
-                             (recur (inc i) (inc openers) closers)))
+                            (if (= n-pairs*2-1 i) #_leftmost-digit?
+                             (list 0 0 0) #_we-have-finished
+                             (recur (inc i) (inc openers) closers))) #_an-opener-but-not-a-swap-point-yet
                           (recur (inc i) openers (inc closers)) #_a-closer))]
                   
                   (if (zero? swap-point)
@@ -92,17 +93,15 @@
                                        i (dec swap-point) #_>>
                                        openers (inc openers)
                                        closers (dec closers)]
-                                  (if (pos? openers)
-                                    (recur (bit-set value i) (dec i) (dec openers) closers)
-                                    (if (pos? closers)
-                                      (recur (bit-clear value i) (dec i) openers (dec closers))
-                                      (do
-                                        (assert (neg? i)
-                                         value)))))]
-                      
-                      (recur value (cons value cumulated))))))                   
-              
-              
+                                  (println "value in loop:" (clojure.pprint/cl-format nil "~,'0',B" value) "openers:" openers "closers:" closers)
+                                  (cond
+                                    (pos? openers) (recur (bit-set   value i) (dec i) (dec openers)     closers)
+                                    (pos? closers) (recur (bit-clear value i) (dec i)      openers (dec closers))
+                                    :else  (do
+                                             (assert (neg? i))
+                                             value)))]
+                      (assert (number? value) (str "value from loop: " value))
+                      (recur value (cons value cumulated))))))
               (humanise [number]
                 (clojure.string/replace
                   (clojure.string/replace (java.lang.Long/toBinaryString number) ;toBinaryString is faster 40ms than clojure.pprint/cl-format 308ms.
@@ -124,12 +123,13 @@
             (map humanise
               (let [;n-pairs-1 (dec n-pairs)
                     ; TODO the following runs indefinitely - but only with dbgf
-                    ;starter-ones (first (dbgf "nth" nth)
-                    ;                                   (dbgf "iterate" iterate #(dbgf shift-and-set %) [0 true]) n-pairs))
-                    starter-ones (first (dbgf "nth" nth
-                                          (dbgf "iterate" iterate #(dbgf shift-and-set %) [0 true]) n-pairs))
+                    ;starter-ones (first (nth ;/---- that "dbgf" causes a runaway. Maybe because iterate is static:?
+                    ;                     (dbgf "iterate" iterate #(dbgf shift-and-set %) [0 true]) n-pairs))
+                    starter-ones (first (nth
+                                          (iterate #(shift-and-set %) [0 true]) n-pairs))
                     _ (println "starter-ones" (clojure.pprint/cl-format nil "~,'0',B" starter-ones))
                     starter      (first (nth  (iterate shift-and-set [starter-ones false]) n-pairs)) #_see-also-next-assert
+                    _ (println "starter" (clojure.pprint/cl-format nil "~,'0',B" starter))
                     _ (assert (= starter (bit-shift-left starter-ones n-pairs)))
                     _ (assert (= (digits starter) (concat (repeat n-pairs true) (repeat n-pairs false))))]
                 
