@@ -57,7 +57,7 @@
 ; 4. That gives you a result. Repeat for the next result.
 ; Optimisations:
 ; 1. Collect, pass & skip the number of consecutive closers on the very right.
-; 3. NOT IMPLEMENTED: Change from parens-flat to parens-flatish: Move code that generates
+; 3. Moved code that generates
 ; new rightmost consecutive openers & closers to the first loop. Why? Time results from parens-flatter show that splitting
 ; loops adds much extra overhead. Hence merge loops together.
 ; Replacing (= XYZ abc) with (zero? abc) and reordering the iteration for it saves little: 605-680ms => 460-660ms
@@ -82,51 +82,58 @@
                 (count (filter (partial = digit) (digits numb))))
               
               ; cons-closers is a group of bits - but 1's instead of 0's - for consecutive closers ) from the very right.
-              (generate [prev cumulated cons-closers num-of-closers]
-                ;(assert (and (<= 0 openers) (<= 0 closers) (<= 0 diff) (= diff (- closers openers))))
-                ;(assert (or (zero? diff) (pos? closers)))
-                ;(println "prev: " (clojure.pprint/cl-format nil "~,'0',B" prev))
-                ;(assert (= (count-digits prev true) (count-digits prev true) n-pairs) (str "prev: " prev))
-                
+                ; OLD Docs:
                 ; Openers and closers contain the respective bits, but:
                 ; - both use 1's - openers, and closers, too. (Closers will have them xor-ed later.)
                 ; - both contain bits, instead of number of bits (as was in parens-flat and parens-flatter).
                 ; - both are 0-based - closers, too (it will be shifted later).
                 ; Closers are the rightmost. Even though openers are left of closers, this symbol doesn't have them
                 ; shifted to the left. That's why we also produce num-of-closers, by which we later shift openers to the left.
-                (let [[swap-point openers closers num-of-closers]
+              (generate [prev cumulated cons-closers num-of-closers]
+                ;OLD assertions:
+                ;(assert (and (<= 0 openers) (<= 0 closers) (<= 0 diff) (= diff (- closers openers))))
+                ;(assert (or (zero? diff) (pos? closers)))
+                ;(println "prev: " (clojure.pprint/cl-format nil "~,'0',B" prev))
+                ;(assert (= (count-digits prev true) (count-digits prev true) n-pairs) (str "prev: " prev))
+                (let [[swap-point openers-extra closers+extra num-of-closers+1]
                       (loop [i num-of-closers
                              openers 0
                              closers cons-closers
+                             num-of-openers 0
                              num-of-closers num-of-closers]
-                        ;(assert (= i (+ openers closers)))
+                        (assert (= i (+ num-of-openers num-of-closers)))
                         (if (bit-test prev i) #_an-opener?
-                          (let [openers+1 (inc openers)]
-                            (if (< openers+1 closers) #_swap-point?
-                              ;(list ...) is slower than [...], because CLJ optimises [...] with destructuring.
-                              [i openers closers] ;(list i openers closers)
+                          (let [num-of-openers+1 (inc num-of-openers)]
+                            (if (< num-of-openers+1 num-of-closers) #_swap-point?
+                              [i (bit-shift-left openers num-of-closers) closers num-of-closers] ;(list ...) is slower than [...]. CLJ must optimise [...] with destructuring.
                               (if (= n-pairs*2-1 i) #_leftmost-digit?
-                                [0 0 0] ;(list 0 0 0) #_we-have-finished
-                                (recur   (inc i)      openers+1    closers))) #_an-opener-but-not-a-swap-point-yet)
-                          (recur         (inc i)      openers (inc closers)) #_a-closer))]
+                                [0 0 0 0] #_we-have-finished
+                                (recur (inc i) (bit-set openers num-of-openers)                        closers (inc num-of-openers)      num-of-closers)) #_an-opener-but-not-a-swap-point-yet))
+                          (recur       (inc i)                         openers (bit-set closers num-of-closers)     num-of-openers  (inc num-of-closers) #_a-closer) #_bit-set-openers-instead-of-clear-for-later-xor))]
                   
                   (if (zero? swap-point)
                     cumulated #_finished
-                    (let [;_ (assert (bit-test prev swap-point)) #_opener
-                          closers-1 (dec closers)
-                          value (loop [value (bit-flip prev swap-point) #_opener==>closer
-                                       i (dec swap-point) #_>>
-                                       openers (inc openers)
-                                       closers closers-1]
-                                  ;(println "value in loop:" (clojure.pprint/cl-format nil "~,'0',B" value) "openers:" openers "closers:" closers)
-                                  (cond
-                                    (pos? openers) (recur (bit-set   value i) (dec i) (dec openers)     closers)
-                                    (pos? closers) (recur (bit-clear value i) (dec i)      openers (dec closers))
-                                    :else  (do
-                                             ;(assert (neg? i))
-                                             value)))]
+                    (let [_ (assert (bit-test prev swap-point)) #_swap-point_is_an_opener
+                          num-of-closers (dec num-of-closers+1)
+                          closers (bit-clear closers+extra num-of-closers)
+                          openers (bit-set   openers-extra (dec swap-point))
+                          prev-swapped (bit-clear prev swap-point) #_opener-into-closer
+                          value (bit-xor (bit-or prev-swapped (bit-shift-left openers num-of-closers)) closers)
+                          
+                          value-OLD '(loop [value (bit-flip prev swap-point) #_opener==>closer
+                                            i (dec swap-point) #_>>
+                                            openers (inc openers)
+                                            closers closers-1]
+                                       ;(println "value in loop:" (clojure.pprint/cl-format nil "~,'0',B" value) "openers:" openers "closers:" closers)
+                                       (cond
+                                         (pos? openers) (recur (bit-set   value i) (dec i) (dec openers)     closers)
+                                         (pos? closers) (recur (bit-clear value i) (dec i)      openers (dec closers))
+                                         :else  (do
+                                                  ;(assert (neg? i))
+                                                  value)))]
                       ;(assert (number? value) (str "value from loop: " value))
-                      (recur value (cons value cumulated) closers-1)))))
+                      (recur value (cons value cumulated) closers num-of-closers)))))
+              ;(recur value (cons value cumulated) closers-1)
               (humanise [number]
                 (clojure.string/replace
                   (clojure.string/replace (java.lang.Long/toBinaryString number) ;toBinaryString is faster 40ms than clojure.pprint/cl-format 308ms.
@@ -146,7 +153,7 @@
           (if (zero? n-pairs)
             ()
             (map humanise
-              (let [;n-pairs-1 (dec n-pairs)
+              (let [
                     ; TODO the following runs indefinitely - but only with dbgf
                     ;starter-ones (first (nth ;/---- that "dbgf" causes a runaway. Maybe because iterate is static:?
                     ;                     (dbgf "iterate" iterate #(dbgf shift-and-set %) [0 true]) n-pairs))
@@ -158,7 +165,7 @@
                 ;_ (assert (= starter (bit-shift-left starter-ones n-pairs)))
                 ;_ (assert (= (digits starter) (concat (repeat n-pairs true) (repeat n-pairs false))))]
                 
-                (generate starter (list starter) n-pairs)))))))))
+                (generate starter (list starter) starter-ones #_ones-serve-as-closers-for-XOR n-pairs)))))))))
 
 (if (resolve 'time-check) ;from shell: clj -e "(def time-check true)" src/clojurist/
   (println "time for n=12 (which generates " (time (count (parens-flatish 12))) "results"))
