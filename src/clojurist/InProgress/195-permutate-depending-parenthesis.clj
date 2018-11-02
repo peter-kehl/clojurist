@@ -74,27 +74,27 @@
     (let [n-pairs*2 (* 2 n-pairs)
           n-pairs*2-1 (dec n-pairs*2)]
       (letfn [(digits [numb]
-                ;{:pre [(number? numb)]}
+                {:pre [(number? numb)]}
                 (vec (reverse (for [i (range 0 n-pairs*2)]
                                 (bit-test numb i)))))
               (count-digits [numb digit]
-                ;{:pre [(number? numb) (or (= true digit) (= false digit) #_no-boolean?-in-CLJ-1_4)]}
+                {:pre [(number? numb) (or (= true digit) (= false digit) #_no-boolean?-in-CLJ-1_4)]}
                 (count (filter (partial = digit) (digits numb))))
               
               ; cons-closers is a group of bits - but 1's instead of 0's - for consecutive closers ) from the very right.
                 ; OLD Docs:
                 ; Openers and closers contain the respective bits, but:
-                ; - both use 1's - openers, and closers, too. (Closers will have them xor-ed later.)
+                ; - both use 1's - openers, and closers, too. (Closers will have them negatedvia bit-and-not.)
                 ; - both contain bits, instead of number of bits (as was in parens-flat and parens-flatter).
                 ; - both are 0-based - closers, too (it will be shifted later).
                 ; Closers are the rightmost. Even though openers are left of closers, this symbol doesn't have them
                 ; shifted to the left. That's why we also produce num-of-closers, by which we later shift openers to the left.
               (generate [prev cumulated cons-closers num-of-closers]
                 ;OLD assertions:
-                ;(assert (and (<= 0 openers) (<= 0 closers) (<= 0 diff) (= diff (- closers openers))))
-                ;(assert (or (zero? diff) (pos? closers)))
-                ;(println "prev: " (clojure.pprint/cl-format nil "~,'0',B" prev))
-                ;(assert (= (count-digits prev true) (count-digits prev true) n-pairs) (str "prev: " prev))
+                (assert (<= num-of-closers n-pairs))
+                (assert (= num-of-closers (count-digits cons-closers true #_ones-for-closers)))
+                (println "prev: " (clojure.pprint/cl-format nil "2r~,'0',B" prev) "cons-closers:" (clojure.pprint/cl-format nil "2r~,'0',B" cons-closers) "num-of-closers:" num-of-closers)
+                (assert (= (count-digits prev true) (count-digits prev false) n-pairs) (str "prev: " (clojure.pprint/cl-format nil "2r~,'0',B" prev)))
                 (let [[swap-point openers-extra closers+extra num-of-closers+1]
                       (loop [i num-of-closers
                              openers 0
@@ -109,16 +109,24 @@
                               (if (= n-pairs*2-1 i) #_leftmost-digit?
                                 [0 0 0 0] #_we-have-finished
                                 (recur (inc i) (bit-set openers num-of-openers)                        closers (inc num-of-openers)      num-of-closers)) #_an-opener-but-not-a-swap-point-yet))
-                          (recur       (inc i)                         openers (bit-set closers num-of-closers)     num-of-openers  (inc num-of-closers) #_a-closer) #_bit-set-openers-instead-of-clear-for-later-xor))]
+                          (recur       (inc i)                         openers (bit-set closers num-of-closers)     num-of-openers  (inc num-of-closers) #_a-closer) #_bit-set-openers-instead-of-clear-for_bit-and-not))]
                   
+                  (println "swap-point:" swap-point "openers-extra:" (clojure.pprint/cl-format nil "2r~,'0',B" openers-extra))
+                  (println "closers+extra:" (clojure.pprint/cl-format nil "2r~,'0',B" closers+extra) "num-of-closers+1:" num-of-closers+1)
                   (if (zero? swap-point)
                     cumulated #_finished
                     (let [_ (assert (bit-test prev swap-point)) #_swap-point_is_an_opener
                           num-of-closers (dec num-of-closers+1)
                           closers (bit-clear closers+extra num-of-closers)
                           openers (bit-set   openers-extra (dec swap-point))
-                          prev-swapped (bit-clear prev swap-point) #_opener-into-closer
-                          value (bit-xor (bit-or prev-swapped (bit-shift-left openers num-of-closers)) closers)
+                          _ (println "openers:" (clojure.pprint/cl-format nil "2r~,'0',B" openers))
+                          prev-swapped (bit-clear prev swap-point) #_opener-into==>closer
+                          _ (println "prev-swapped:" (clojure.pprint/cl-format nil "2r~,'0',B" prev-swapped))
+                          openers-shifted (bit-shift-left openers num-of-closers)
+                          _ (println "openers-shifted:" (clojure.pprint/cl-format nil "2r~,'0',B" openers-shifted))
+                          prev-swapped-with-openers (bit-or prev-swapped openers-shifted)
+                          _ (println "prev-swapped-with-openers:" (clojure.pprint/cl-format nil "2r~,'0',B" prev-swapped-with-openers))
+                          value (bit-and-not prev-swapped-with-openers closers)
                           
                           value-OLD '(loop [value (bit-flip prev swap-point) #_opener==>closer
                                             i (dec swap-point) #_>>
@@ -131,7 +139,7 @@
                                          :else  (do
                                                   ;(assert (neg? i))
                                                   value)))]
-                      ;(assert (number? value) (str "value from loop: " value))
+                      (assert (number? value) (str "value from loop: " value))
                       (recur value (cons value cumulated) closers num-of-closers)))))
               ;(recur value (cons value cumulated) closers-1)
               (humanise [number]
@@ -143,7 +151,7 @@
               ; Use with to set first n-pairs bits as openers (, then clear next n-pairs bits as closers )
               ; Not efficient, but it's only for starter. Return a pair (new-value bit) to be used with (iterate....). 
               (shift-and-set [[value do-set]]
-                ;{:pre [(number? value) (or (= true do-set) (= false do-set)) #_no-boolean?-in-CLJ-1_4]}
+                {:pre [(number? value) (or (= true do-set) (= false do-set)) #_no-boolean?-in-CLJ-1_4]}
                 (let [shifted (bit-shift-left value 1)
                       new-value (if do-set
                                   (bit-set shifted 0)
@@ -159,11 +167,11 @@
                     ;                     (dbgf "iterate" iterate #(dbgf shift-and-set %) [0 true]) n-pairs))
                     starter-ones (first (nth
                                           (iterate #(shift-and-set %) [0 true]) n-pairs))
-                    ;_ (println "starter-ones" (clojure.pprint/cl-format nil "~,'0',B" starter-ones))
-                    starter      (first (nth  (iterate shift-and-set [starter-ones false]) n-pairs)) #_see-also-next-assert]
-                ;_ (println "starter" (clojure.pprint/cl-format nil "~,'0',B" starter))
-                ;_ (assert (= starter (bit-shift-left starter-ones n-pairs)))
-                ;_ (assert (= (digits starter) (concat (repeat n-pairs true) (repeat n-pairs false))))]
+                    ;_ (println "starter-ones" (clojure.pprint/cl-format nil "2r~,'0',B" starter-ones))
+                    starter      (first (nth  (iterate shift-and-set [starter-ones false]) n-pairs)) #_see-also-next-assert
+                    ;_ (println "starter" (clojure.pprint/cl-format nil "2r~,'0',B" starter))
+                    _ (assert (= starter (bit-shift-left starter-ones n-pairs)))
+                    _ (assert (= (digits starter) (concat (repeat n-pairs true) (repeat n-pairs false))))]
                 
                 (generate starter (list starter) starter-ones #_ones-serve-as-closers-for-XOR n-pairs)))))))))
 

@@ -3,31 +3,32 @@
 
 ;http://www.4clojure.com/problem/140
 (def veitch
-  (fn [sets-orig]
-    ; map of maps {field: boolean}. Because of false, use contains? or nil? to detect relevance (presence) of a field.
+  (fn [rules-orig]
     (let [upper-case? (fn [sym] (let [st (str sym)]
                                   (= (clojure.string/upper-case st) st)))
-          full-maps (into #{} ;a set of maps, each {upper-case-symbol boolean...} for all symbols
-                      (map
-                        (fn [set-orig]
-                          (into {} (map
-                                     (fn [sym]
-                                       (let [on (upper-case? sym)]
-                                         [(clojure.string/upper-case sym) on]))
-                                     set-orig)))
-                        sets-orig))
+          full-rules (into #{} ;A set of maps, each {upper-case-symbol boolean, ...} for all fields (based on symbols). Because of false, use contains? or nil? to detect relevance (presence) of a field.
+                       (map
+                         (fn [rule]
+                           (into {} (map
+                                      (fn [sym]
+                                        (let [on (upper-case? sym)]
+                                          [(clojure.string/upper-case sym) on]))
+                                      rule)))
+                         rules-orig))
           fields (map ;a seq. of upper-case strings of all possible symbols. Easy, because
-                      ;every set in sets-orig contains all symbols (either on/off - uppercase/lowercase).
+                   ;every set in sets-orig contains all symbols (either on/off - uppercase/lowercase).
                    #(clojure.string/upper-case %)
-                   (first sets-orig))
-          field-value-others (reduce ;3D map { upper-case { boolean-for-that-symbol {other-uppercase boolean...}}}
+                   (first rules-orig))
+          ;;2D map of sets of maps { upper-case { boolean-for-that-symbol #{set of maps, one map per rule having that boolean-for-that-symbol: {other-uppercase boolean, ...}, ...}
+          field-value-others (reduce 
                                (fn [res full]
-                                 ;TODO iterate over fields
-                                 (assoc-in res (list (clojure.string/upper-case))))
+                                 (for [rule full-rules]
+                                   (assoc-in res (list field (clojure.string/upper-case)))))
                                #{}
-                               full-maps)
-          ;Where (= ((field-value-others chosen-upper-case) true) ((field-value-others chosen-upper-case) false), we can
-          ;simplify that rule by eliminating that chosen-upper-case from all connected rules 
+                               full-rules)
+          ;Where ((field-value-others chosen-upper-case) true) and ((field-value-others chosen-upper-case) false)
+          ;contain some equal entries, we can
+          ;simplify that rule by eliminating that chosen-upper-case from those equal entries (connected rules). 
           _ 1]
       1)))    
       
