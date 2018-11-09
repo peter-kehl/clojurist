@@ -118,6 +118,8 @@
                     (let [_ (assert (bit-test prev swap-point)) #_swap-point_is_an_opener
                           num-of-closers (dec num-of-closers+1)
                           closers (bit-clear closers+extra num-of-closers)
+                          
+                          ;TODO shift openers before sorting extra?
                           openers (bit-set   openers-extra (dec swap-point))
                           _ (println "openers:" (clojure.pprint/cl-format nil "2r~,'0',B" openers))
                           prev-swapped (bit-clear prev swap-point) #_opener-into==>closer
