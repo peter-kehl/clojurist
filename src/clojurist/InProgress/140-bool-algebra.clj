@@ -67,17 +67,16 @@
                                                       (if (= new-short-true new-short-false)
                                                         (let [
                                                           _ (assert (and prev-short-true prev-short-false))
-                                                          _ (println "Field: " field ", unshort-partial: " (humanise unshort-partial))
-                                                          _ (println "full-true: " (humanise  full-true) "prev-short-true: "  (humanise prev-short-true) "->" (humanise new-short-true))
-                                                          _ (println "full-false:" (humanise full-false) "prev-short-false:"  (humanise prev-short-false) "->" (humanise new-short-false))
+                                                          ;_ (println "Field: " field ", unshort-partial: " (humanise unshort-partial))
+                                                          ;_ (println "full-true: " (humanise  full-true) "prev-short-true: "  (humanise prev-short-true) "->" (humanise new-short-true))
+                                                          ;_ (println "full-false:" (humanise full-false) "prev-short-false:"  (humanise prev-short-false) "->" (humanise new-short-false))
                                                           f2s-new (assoc f2s full-true new-short-true full-false new-short-false)
-                                                          _ (println (humanise-rule2rule f2s-new))]
+                                                          ;_ (println (humanise-rule2rule f2s-new))
+                                                              ]
                                                         f2s-new)
                                                        f2s)))
                                                   full2short unshort-partials-shared)
-                                           #_(if false ; *SOME* of (= partials-true partials-false)
-                                            1
-                                            full2short #_no-shortening-of-this-field)))
+                                            ))
                                       full-rules-to-themselves fields)
           ;_ (do (println "full-to-short:") (clojure.pprint/pprint full-rules-to-short))
           set-of-shortened (into #{} (vals full-rules-to-short))
