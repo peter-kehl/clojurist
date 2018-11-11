@@ -15,14 +15,15 @@
         d-r [1 1], d-l [1 -1], u-l [-1 -1], u-r [-1 1]
         ;directions listed in order, each 45degrees to the right after the previous one.
         directions [d-r d-l u-l u-r]
-        directions-reversed (reverse directions)
-        dir? (fn [[delta-x delta-y]] (and (<= -1 delta-x 1) (<= -1 delta-y 1) (not= delta-x delta-y 0)))
+        directions-reversed (reverse directions) ;_ (assert (= directions-reversed [u-r u-l d-l d-r]))
+        dir? (fn [[delta-x delta-y :as all]] (and (= (count all) 2) (<= -1 delta-x 1) (<= -1 delta-y 1) (not= delta-x delta-y 0)))
         turn (fn [prev-dir] {:pre [(dir? prev-dir)]};previous direction => new direction 45degrees to the right
                (if (= prev-dir u-r)
                  d-r
-                 (first (for [dir directions-reversed
+                 (last (for [dir directions-reversed
                               :while (not= dir prev-dir)]
                           dir))))
+        _ (assert (and (= (turn u-r) d-r))) _ (assert (= (turn d-r) d-l)) _ (assert (and (= (turn d-l) u-l) (= (turn u-l) u-r)))
         place? (fn [[x y :as pl]] (and (= (count pl) 2) (number? x) (number? y)))
         move (fn [[x y :as pl] [x-delta y-delta :as dir]] {:pre [(place? pl) (dir? dir)]}
                [(+ x x-delta) (+ y y-delta)])
@@ -39,7 +40,7 @@
         fill-in (fn [places [x y :as place] value] {:pre [(matrix? places) (place? place) (entry? value)] :post [(= ((% x)y) value)]} ;like assoc-in, but using new-map
                   (let [row (get places x (new-row))
                         row-updated (assoc row y value)]
-                    (println :fill-in :place place :value value)
+                    ;(println :fill-in :place place :value value)
                     (assoc places x row-updated)))
         ;start with direction up to the right u-r, because place-and-dir will turn it to d-r after the 1st digit.
         ;To complete a square, we need an even number of turns (ignoring the very first "turn" from starting direction u-r).
@@ -55,8 +56,8 @@
                            (let [[place dir] (place-dir place-last dir-last)
                                  same-dir? (= dir-last dir)
                                  num-of-turns-new (if same-dir? num-of-turns (inc num-of-turns))
-                                 _ (println digits-leftover)
-                                 places-new (fill-in places place (first digits-leftover))]
+                                 places-new (fill-in places place (first digits-leftover))
+                                 _ (println :same-dir? same-dir? :num-of-turns-new num-of-turns-new)]
                              (recur places-new place dir num-of-turns-new (next digits-leftover) ))
                            [places place-last dir-last num-of-turns])
                        )
@@ -70,7 +71,7 @@
                                                                [(min min-x x) (max max-x x) (min min-y y) (max max-y y)])
                                                              [10 -10 10 -10]
                                                              (for [[x row] places, [y _] row] [x y]))
-                           _ (println "min-x" min-x "max-x" max-x "min-y" min-y "max-y" max-y)
+                           ;_ (println "min-x" min-x "max-x" max-x "min-y" min-y "max-y" max-y)
                            rows-with-spaces (for [x (range min-x (inc max-x))]
                                                (apply str
                                                   (for [y (range min-y (inc max-y))]
