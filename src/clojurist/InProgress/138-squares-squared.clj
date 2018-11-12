@@ -27,11 +27,14 @@
         place? (fn [[x y :as pl]] (and (= (count pl) 2) (number? x) (number? y)))
         move (fn [[x y :as pl] [x-delta y-delta :as dir]] {:pre [(place? pl) (dir? dir)]}
                [(+ x x-delta) (+ y y-delta)])
+        right-dir-and-neighbour (fn [place dir]
+                                  (let [dir-right (turn dir)]
+                                    [dir-right (move place dir-right)]))
         place-dir (fn [places place-prev dir-prev] ;return [new-place new-dir] where new-dir may be the same as dir-prev
                         {:pre [(place? place-prev) (dir? dir-prev) #_(or (true? over-two?) (false? over-two?))] :post [(place? (first %)) (dir? (second %))]}
-                        (let [dir-right (turn dir-prev)
-                              place-prev-right-neighbour (move place-prev dir-right)
-                              _ (println :place-prev-right-neighb place-prev-right-neighbour)]
+                        (let [[dir-right place-prev-right-neighbour] (right-dir-and-neighbour place-prev dir-prev)
+                               ;_ (println :place-prev-right-neighb place-prev-right-neighbour)
+                              ]
                             (if (at places place-prev-right-neighbour)
                               (let [place-prev-direct-neighbour (move place-prev dir-prev)]
                                 [place-prev-direct-neighbour dir-prev])
@@ -76,10 +79,32 @@
                              (recur places-new place dir num-of-turns-new (next digits-leftover) ))
                            [places place-last dir-last num-of-turns])
                        )
-                     _ 1 ;when filling up with stars *, after the very last (even numbered) turn fill only places that have a neihbour on the right.
-                     _ (if false #_TODO-based-on-num-of-turns
-                           1 ;fill up with stars
-                           places-for-digits)]
-                 places-for-digits)
+                     ;We need to finish with an even number of turns. However, if the digits were filled with an even number of turns, but the last
+                     ;digit didn't have a right neighbour, then that digit was "out of square," and we need two more turns.
+                     ;When filling up with stars *, after the very last (even numbered) turn fill only places that have a neihbour on the right.
+                     even-turn-but-out-of-square (and (even? num-of-turns)
+                                                      (let [[_ last-digit-right-neighbour] (right-dir-and-neighbour place-last-digit dir-last-digit)]
+                                                        (not (at places-for-digits last-digit-right-neighbour))))
+                     dir-last-digit-adjusted (if even-turn-but-out-of-square
+                                               (turn dir-last-digit)
+                                               dir-last-digit)
+                     num-of-turns-adjusted (if even-turn-but-out-of-square
+                                             (inc num-of-turns)
+                                             num-of-turns)
+                     places (loop [places places-for-digits
+                                   pl place-last-digit
+                                   dir dir-last-digit-adjusted
+                                   even-turns (even? num-of-turns-adjusted)]
+                              (let [direct-neighbour (move pl dir)
+                                    [dir-right direct-right-neighbour] (right-dir-and-neighbour direct-neighbour dir)]
+                                (if (at places direct-right-neighbour)
+                                  (let [places-* (fill-in places direct-neighbour \*)]
+                                    (recur places-* direct-neighbour dir even-turns))
+                                  (if (not even-turns)
+                                    (let [places-* (fill-in places direct-right-neighbour \*)]
+                                      (recur places-* direct-right-neighbour dir-right true))
+                                    places))))
+                     _ (print-places places)]
+                 places)
         ;_ (println :places places)
-        ] rows-strings)))
+        ] (rows-strings places))))
