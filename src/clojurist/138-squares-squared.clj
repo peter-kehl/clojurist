@@ -1,12 +1,13 @@
 ;(clojure.main/load-script "/home/pkehl/GIT/clojurist/src/clojurist/dbg.clj")
 
-(def squares-sq (fn [num-from num-max]
+(def squares-sq
+ (fn [num-from num-max]
   (let [nums (take-while #(<= % num-max)
                (iterate #(* % % #_Math.pow-is-for-double-only) num-from))
         ;_ (println "nums:" nums)
         digits (for [n nums
                      d (str n)] d)
-        _ (println :digits digits)
+        ;_ (println :digits digits)
         matrix? map?
         ;mx is a matrix-like map of maps, with indexes that can be negative: relative to the start point.
         at (fn [mx [x y :as coordinates]] {:pre [(or (matrix? mx) (seq? mx)) (= (count coordinates) 2)]} #_returns-nil-if-not-set (get-in mx [x y]))
@@ -67,18 +68,22 @@
                             dir-last u-r
                             num-of-turns -1
                             digits-leftover (next digits)]
-                       (println :places places ":")
-                       (print-places places)
-                       (println :place-last place-last :dir-last dir-last :num-of-turns num-of-turns :digits-leftover digits-leftover)
+                       ;(println :places places ":")
+                       ;(print-places places)
+                       ;(println :place-last place-last :dir-last dir-last :num-of-turns num-of-turns :digits-leftover digits-leftover)
                        (if digits-leftover
                            (let [[place dir] (place-dir places place-last dir-last)
                                  same-dir? (= dir-last dir)
                                  num-of-turns-new (if same-dir? num-of-turns (inc num-of-turns))
                                  places-new (fill-in places place (first digits-leftover))
-                                 _ (println :same-dir? same-dir? :num-of-turns-new num-of-turns-new)]
+                                 ;_ (println :same-dir? same-dir? :num-of-turns-new num-of-turns-new)
+                                 ]
                              (recur places-new place dir num-of-turns-new (next digits-leftover) ))
                            [places place-last dir-last num-of-turns])
-                       )
+                       )]
+                 (if (= (count digits) 1)
+                   places-for-digits
+                   (let [
                      ;We need to finish with an even number of turns. However, if the digits were filled with an even number of turns, but the last
                      ;digit didn't have a right neighbour, then that digit was "out of square," and we need two more turns.
                      ;When filling up with stars *, after the very last (even numbered) turn fill only places that have a neihbour on the right.
@@ -101,10 +106,14 @@
                                   (let [places-* (fill-in places direct-neighbour \*)]
                                     (recur places-* direct-neighbour dir even-turns))
                                   (if (not even-turns)
-                                    (let [places-* (fill-in places direct-right-neighbour \*)]
-                                      (recur places-* direct-right-neighbour dir-right true))
+                                    (let [[_ right-neighbour] (right-dir-and-neighbour pl dir) 
+                                          continue-direct (at places right-neighbour)
+                                          pl-direct-or-right (if continue-direct direct-neighbour right-neighbour)
+                                          places-* (fill-in places pl-direct-or-right \*)]
+                                      (recur places-* pl-direct-or-right dir-right true))
                                     places))))
-                     _ (print-places places)]
-                 places)
+                     ;_ (print-places places)
+                    ]
+                 places)))
         ;_ (println :places places)
         ] (rows-strings places))))
