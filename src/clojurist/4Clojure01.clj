@@ -1,18 +1,20 @@
 ; Fibonacci 8: '(1 1 2 3 5 8 13 21)
-( (fn [N]
+(def fibonacci ; "Return a vector with first N Fib numbers."
+  (fn [N]
     (case N
       [1] 1
       [2] [1 1]
-      (loop [so-far [1 1] n 3 N N]
+      (loop [so-far [1 1]
+             n 3
+             N N]
          (if (<= n N)
-           (recur (conj so-far (+ (so-far (- n 3)) (so-far (- n 2)))) (inc n) N)
-           so-far)))) 8)
+           (recur (conj so-far (+ (so-far (- n 3)) (so-far (- n 2))))
+                  (inc n)
+                  N)
+           so-far)))))
 
-;  http://www.4clojure.com/problem/27 palindrome?
-( #(let [v (vec %)] (= v (reverse v))) "abcba")   
-       
-;http://www.4clojure.com/problem/28
-( (fn [ [& items]] items) [1 2]) ;destructurizes both '(1 2) and [1 2], into a seq.
+;028-flatten-sequence
+#_( (fn [ [& items]] items) [1 2]) ;destructurizes both '(1 2) and [1 2], into a seq.
 ( (fn [in]
     (loop [[& in] in
            out '()]
@@ -42,10 +44,10 @@
   (filter (complement sequential?)
     (tree-seq sequential? seq s)))
 
-;http://www.4clojure.com/problem/solutions/29
+;029-filter-upper-case
 ((fn [st]
   (let [isUpperCh
-        (fn [ch]  (re-find #"[A-Z]" (str ch)))]
+        (fn [ch]  (re-find #"[A-Z]" (str ch)))] ;could have compared (int ch)
    (apply str (filter isUpperCh st)))) 
  "cVaAbXyP")
 ;from others:
@@ -54,7 +56,7 @@
 #(clojure.string/replace % #"[^A-Z]" "")
 #(apply str (re-seq #"[A-Z]" %))
 
-;http://www.4clojure.com/problem/30
+;030-dedupe-consec-duplicates
 (fn [in]
   (loop
     [in (sequence in)
@@ -67,16 +69,16 @@
           (recur (rest in) out)  #_skip
           (recur (rest in) (conj out (first in))))))))
  ;from others:
-(fn [s
-        (->> (partition 2 1 [0] s)
-             (remove #(= (first %) (last %)))
-             (map first))])
+(fn [s]
+  (->> (partition 2 1 [0] s)
+       (remove #(= (first %) (last %)))
+       (map first)))
 #(->> % (partition-by identity) (map first)) 
 (fn [a]
   (map first (partition-by identity a)))
 #(reduce (fn [a itm] (if (= (last a) itm) a (conj a itm))) [] %)
 
-;http://www.4clojure.com/problem/31
+;031-pack-consec-duplicates
 ((fn pack
   ([in] (pack in [])) ;can't recur into version with a different number of arugments!
   ([in out] (pack in out :nothing-repeated))
@@ -92,7 +94,6 @@
             (let [pushed (peek out)]
               (if (= pushed one)
                [one one] #_ (the first time it is repeated, hence make it into a list)
-                
                (conj (peek out) one))))
           one)
         (recur
@@ -101,7 +102,7 @@
           one))))))
  [1 1 2 1 1 1 1 3 3])
 
-;http://www.4clojure.com/problem/32
+;032-duplicate-each-elem
 (reduce #(conj %1 %2 %2) [] [1 2 3])
 ;others:
 (fn [x] (interleave x x))
@@ -111,7 +112,7 @@
 (#(mapcat list % %) [1 2 3])
 #(mapcat (fn [a] (list a a)) %)
 
-;http://www.4clojure.com/problem/33 no flatten, because that flattens any items that are collections themselves!
+;033 no flatten, because that flattens any items that are collections themselves!
 ;Following is wrong. Read the spec!
 ((fn [seq rep]
    (apply concat (repeat rep seq)))
@@ -123,11 +124,11 @@
 ;others
 #(apply concat (map (partial repeat %2) %1))
 #(if (= %2 1) %1 (apply interleave (repeat %2 %1)))
-fn [s n]
-  (mapcat (partial repeat n) s)
+(fn [s n]
+  (mapcat (partial repeat n) s))
 #(mapcat (partial repeat %2) %1)
 
-;http://www.4clojure.com/problem/34 implement range
+;034 implement range
 ( (fn [start end]
     (take (- end start)
       (iterate inc start)))
@@ -140,19 +141,20 @@ fn [s n]
   (map-indexed + (repeat (- b a) a))); <<<<
 
 (max-key #(/ 1 %) 1 2 3 0.3 0.2)
-;http://www.4clojure.com/problem/38 implement max
+;038 implement max
 ( (fn [& seq] (* -1 (apply min (map #(* -1 %) seq))))
- 1 8 3 4)    
+ 1 8 3 4)
 ( (fn [& seq]
     (reduce #(if (> %1 %2) %1 %2) seq))
-  1 8 3 4)   
+  1 8 3 4)
 ;others:
 #(last (sort %&))
 (fn [& nums] (->> nums (into (sorted-set)) last))
 (fn [& args] (last (sort args)))
 #(last (sort %&))
 (fn [& s] (- (reduce min (map #(- %) s))))
-;http://www.4clojure.com/problem/39 interleave
+
+;039 interleave
 ( (fn [a b]
     (mapcat #(vector %1 %2) a b))
  [1 2] [3 4 5 6])
@@ -161,27 +163,22 @@ fn [s n]
 ;others
 (mapcat list [1 2] [3 4 5 6])
     
-;http://www.4clojure.com/problem/40 interpose
+;040 interpose
 ( (fn [a b]
     (butlast (mapcat #(vector % a) b)))
  0 [1 2 3])
 ;(__ 0 [1 2 3])
-( (fn [b]
-    (pop (mapcat vector b)))
- [1 2 3])
 (assert (= (mapcat vector [1 2 3]) '(1 2 3)))
 (pop '(1 2 3))
 (type (mapcat vector [1 2 3])) ;LazySeq doesn't allow pop, but it allows rest and butlast!
-(pop (mapcat vector [1 2 3]))   
 (assert (= (butlast '(1 2 3)) '(1 2)))    
 ;others
-(butlast (mapcat list %2 (repeat %1)))
 (fn [d s] (rest (mapcat #(list d %) s)))
 #(rest (mapcat (fn [a] [%1 a]) %2))
 #(next (interleave (repeat %) %2))
 (fn [sep [f & r]] (cons f (flatten (map #(list sep %) r))))
 
-;http://www.4clojure.com/problem/41 drop every n-th item
+;041 drop every n-th item
 ( (fn [s n]
     (apply concat (map-indexed
                     (fn [index item] (if (not= (mod (inc index) n) 0)
@@ -206,10 +203,7 @@ fn [s n]
                 second)
         (map vector % (cycle (range %2))))) ;<< cycle
 
-;http://www.4clojure.com/problem/42 factorial
-#(reduce * (range 1 (inc %))) ; When typing (range) in InstaREPL, start with the boundaries!
-
-;http://www.4clojure.com/problem/43 reverse interleave
+;043 reverse interleave
 (
  (fn [s n]
    (reduce
@@ -218,13 +212,12 @@ fn [s n]
          result
          (list (mod index n)) ;cycle/partition between n sub-sequences
          #(conj % entry)))
-       
      (vec (repeat n [])) ; When typing in InstaREPL, type boundaries first.
      (map-indexed
        (fn [i e]
          [i e])
        s)))
- 
+
  #_( [1 2 3 4 5 6] 2)
  (range 10) 5)
 ;others
@@ -238,11 +231,11 @@ fn [s n]
 (group-by #(mod % 2) '(1 2 3)) ;values with unique key get wrapped in a vector anyway
 #(vals (group-by (fn [itm] (mod itm %2)) %1))
 #(apply map list (partition %2 %))
-(fn [s x
-         (map #(take-nth x (drop % s)) ;<<<<<< take-nth
-              (range x))])
+(fn [s x]
+  (map #(take-nth x (drop % s)) ;<<<<<< take-nth
+       (range x)))
 
-;http://www.4clojure.com/problem/44 rotate in *either* direction
+;044 rotate in *either* direction
 ; subseq, rsubseq work with sorted collections only!
 ( (fn [n s]
     (let [n (mod n (count s))]
@@ -260,7 +253,7 @@ fn [s n]
 ; also take-last, drop-last
 ; (->> a (take 7) (drop 3)) ; get 4 elements starting from 3
 
-;http://www.4clojure.com/problem/46 higher order reverse args
+;046 higher order reverse args
 ((
   #(
      fn [ & args]
@@ -268,7 +261,7 @@ fn [s n]
   nth)
  2 [1 2 3 4 5])
 
-;http://www.4clojure.com/problem/49 split-at
+;049 split-at
 ((fn [n s]
    [(take n s) (drop n s)])
  3 [1 2 3 4 5 6])
@@ -327,7 +320,7 @@ fn [s n]
 ;
 complement ;higher order
 ;https://clojuredocs.org/clojure.core/for
-(time (dorun (for [x (range 10) y (range 100) :when (> x y)] [x y])))
+;(time (dorun (for [x (range 10) y (range 100) :when (> x y)] [x y])))
 
 ;http://www.4clojure.com/problem/54 partition
 ( (fn [n in]
@@ -444,8 +437,8 @@ partial reduce
        (sorted-set-by
          #(< (mod % 4) (mod %2 4))
          0 1)
-       [0 4 1 2])
-     3)))
+       [0 4 1 2]))
+   3))
 ; keep-indexed
 
 ((fn [in]
@@ -583,95 +576,27 @@ reduce #(if ((set %) %2) % (conj % %2)) []
 ;others
 (fn r 
   ([f s] (r f (first s) (rest s)))
-  ([f x [a & b]
-    (if a (lazy-cat [x] (r f (f x a) b)) [x])]))
+  ([f x [a & b]]
+    (if a (lazy-cat [x] (r f (f x a) b)) [x])))
 
 (fn reducts
-  ([f [arg & args]
-    (reducts f arg args)])
-  ([f v [arg & args]
+  ([f [arg & args]]
+    (reducts f arg args))
+  ([f v [arg & args]]
     (if-not arg
       (list v)
-      (cons v (lazy-seq (reducts f (f v arg) args))))]))
+      (cons v (lazy-seq (reducts f (f v arg) args))))))
 
 (fn !
   ([f [x & xs]] (! f x xs))
-  ([f e [x & xs]
+  ([f e [x & xs]]
     (let [n (f e x)]
       (if (not-empty xs)
         (cons e (lazy-seq (! f n xs)))
-        [e n]))]))
+        [e n]))))
 
 (fn d
   ([f x [h & r]] (cons x (if h (lazy-seq (d f (f x h) r)))))
   ([f [h & r]] (d f h r)))
 
-
-(take 5 (__ + (range)))
-(last (__ * 2 [3 4 5]))
 (assert (= (type (reductions * [1 2 3])) clojure.lang.LazySeq))
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
-           
